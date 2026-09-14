@@ -1,0 +1,44 @@
+<%- include('partials/head', { withSidebar: true, activeNav: 'cliente' }) %>
+<div class="page-head">
+  <h1>Mis pedidos</h1>
+  <p class="muted">
+    Hola, <strong><%= user.name %></strong>.
+    Solo ves pedidos de tu cuenta
+    <% if (customer) { %>(<%= customer.name %>)<% } %>.
+  </p>
+</div>
+
+<div class="card">
+  <% if (!orders.length) { %>
+    <p class="muted">No tienes pedidos registrados.</p>
+  <% } else { %>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Estado</th>
+          <th>Dirección</th>
+          <th>Chofer</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% orders.forEach(o => { %>
+        <tr>
+          <td><code><%= o.tracking_code %></code></td>
+          <td><span class="badge <%= badgeClass(o.status) %>"><%= statusLabel(o.status) %></span></td>
+          <td class="small"><%= o.address %></td>
+          <td><%= o.chofer_name || '—' %></td>
+          <td>
+            <a class="btn btn-sm" href="/cliente/pedido/<%= o.id %>">Ver</a>
+            <a class="btn btn-sm btn-ghost" href="/rastreo?codigo=<%= encodeURIComponent(o.tracking_code) %>" target="_blank">Mapa</a>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <% } %>
+</div>
+<%- include('partials/foot') %>

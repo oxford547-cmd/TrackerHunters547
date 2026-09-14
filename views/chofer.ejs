@@ -1,0 +1,52 @@
+<%- include('partials/head', { narrow: true, withSidebar: true, activeNav: 'chofer' }) %>
+<div class="page-head">
+  <h1>Mis entregas</h1>
+  <p class="muted">Cuando el pedido esté <strong>En camino</strong>, comparte GPS y marca Entregado.</p>
+</div>
+
+<% if (!orders.length) { %>
+  <div class="card"><p class="muted">No tienes pedidos activos asignados.</p></div>
+<% } %>
+
+<% orders.forEach(o => { %>
+<div class="card mb order-card" data-order-id="<%= o.id %>" data-status="<%= o.status %>">
+  <div class="order-card-head">
+    <div>
+      <code><%= o.tracking_code %></code>
+      <span class="badge <%= badgeClass(o.status) %>"><%= statusLabel(o.status) %></span>
+    </div>
+  </div>
+  <p><strong><%= o.customer_name %></strong><br>
+    <span class="muted"><%= o.phone %></span><br>
+    <%= o.address %>
+  </p>
+  <% if (o.notes) { %><p class="muted small"><%= o.notes %></p><% } %>
+
+  <% if (o.status === 'en_camino') { %>
+    <div class="gps-box">
+      <button type="button" class="btn btn-primary btn-block js-share-gps" data-order-id="<%= o.id %>">
+        Compartir ubicación en vivo
+      </button>
+      <p class="gps-status muted small" id="gps-status-<%= o.id %>">GPS inactivo</p>
+      <button type="button" class="btn btn-ok btn-block js-mark-delivered" data-order-id="<%= o.id %>">
+        Marcar Entregado
+      </button>
+    </div>
+  <% } else { %>
+    <p class="muted small">Espera a que el encargado pase el pedido a <strong>En camino</strong>.</p>
+  <% } %>
+</div>
+<% }) %>
+
+<% if (recent.length) { %>
+<div class="card mt">
+  <h2>Entregados recientes</h2>
+  <ul class="list-plain">
+    <% recent.forEach(o => { %>
+      <li><code><%= o.tracking_code %></code> — <%= o.customer_name %> <span class="muted small"><%= o.delivered_at %></span></li>
+    <% }) %>
+  </ul>
+</div>
+<% } %>
+
+<%- include('partials/foot', { scripts: '<script src="/assets/js/chofer-gps.js"></script>' }) %>

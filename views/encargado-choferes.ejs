@@ -1,0 +1,63 @@
+<%- include('partials/head', { withSidebar: true }) %>
+<div class="dash-head">
+  <div>
+    <h1 class="dash-title lime">Altas de choferes</h1>
+    <p class="muted">Crea usuarios chofer con usuario y contraseña, solo para este portal.</p>
+  </div>
+  <div class="dash-actions">
+    <a class="btn btn-glass" href="/encargado">Dashboard</a>
+  </div>
+</div>
+
+<div class="two-col">
+  <div class="card mb">
+    <h2>Choferes del portal</h2>
+    <% if (!choferes.length) { %>
+      <p class="muted small">Aún no hay choferes.</p>
+    <% } else { %>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Usuario</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% choferes.forEach(c => { %>
+          <tr>
+            <td><strong><%= c.name %></strong></td>
+            <td><code><%= c.username %></code></td>
+            <td>
+              <% if (c.active) { %>
+                <span class="badge badge-ok">Activo</span>
+              <% } else { %>
+                <span class="badge badge-muted">Inactivo</span>
+              <% } %>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+  </div>
+
+  <div class="card mb">
+    <h2>Nuevo chofer</h2>
+    <form method="post" action="/encargado/choferes" class="form-stack">
+      <label>Nombre
+        <input type="text" name="name" required>
+      </label>
+      <label>Usuario
+        <input type="text" name="username" required autocomplete="off">
+      </label>
+      <label>Contraseña
+        <input type="password" name="password" required minlength="6" autocomplete="new-password">
+      </label>
+      <button type="submit" class="btn btn-glass-hot">Agregar chofer</button>
+    </form>
+  </div>
+</div>
+<%- include('partials/foot') %>

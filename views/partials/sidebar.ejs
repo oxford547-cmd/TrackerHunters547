@@ -1,0 +1,35 @@
+<%
+  const _u = (typeof user !== 'undefined') ? user : null;
+  const _nav = (typeof activeNav !== 'undefined') ? activeNav : '';
+  const role = _u ? _u.role : null;
+%>
+<% if (role === 'encargado' || role === 'chofer' || role === 'cliente') { %>
+<aside class="sidebar" id="app-sidebar" aria-label="Menú lateral">
+  <div class="sidebar-brand">
+    <span class="sidebar-brand-text"><%= typeof brandName !== 'undefined' && brandName ? brandName : 'Hunters 547' %></span>
+    <button type="button" class="sidebar-close btn-icon" id="sidebar-close" aria-label="Cerrar menú">×</button>
+  </div>
+  <nav class="sidebar-nav">
+    <% if (role === 'encargado') { %>
+      <a class="sidebar-link <%= _nav === 'dashboard' ? 'is-active' : '' %>" href="/encargado">Dashboard</a>
+      <a class="sidebar-link <%= _nav === 'nuevo' ? 'is-active' : '' %>" href="/encargado/nuevo">Nuevo pedido</a>
+      <a class="sidebar-link <%= _nav === 'clientes' ? 'is-active' : '' %>" href="/encargado/clientes">Altas clientes</a>
+      <a class="sidebar-link <%= _nav === 'choferes' ? 'is-active' : '' %>" href="/encargado/choferes">Altas choferes</a>
+      <a class="sidebar-link" href="/rastreo">Rastreo</a>
+    <% } else if (role === 'chofer') { %>
+      <a class="sidebar-link <%= _nav === 'chofer' ? 'is-active' : '' %>" href="/chofer">Mis entregas</a>
+      <a class="sidebar-link" href="/rastreo">Rastreo</a>
+    <% } else if (role === 'cliente') { %>
+      <a class="sidebar-link <%= _nav === 'cliente' ? 'is-active' : '' %>" href="/cliente">Mis pedidos</a>
+      <a class="sidebar-link" href="/rastreo">Rastreo</a>
+    <% } %>
+  </nav>
+  <div class="sidebar-foot">
+    <span class="muted small"><%= _u.name %></span>
+    <form method="post" action="/logout">
+      <button type="submit" class="btn btn-glass btn-sm btn-block">Salir</button>
+    </form>
+  </div>
+</aside>
+<div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
+<% } %>

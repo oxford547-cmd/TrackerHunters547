@@ -1,0 +1,81 @@
+<%- include('partials/head', { dash: true, wide: true }) %>
+<div class="dash-head">
+  <div>
+    <h1 class="dash-title"><%= mode === 'create' ? 'Nuevo portal' : 'Editar portal' %></h1>
+    <p class="muted">Datos de la empresa cliente, logo y credenciales del encargado</p>
+  </div>
+  <div class="dash-actions">
+    <a class="btn btn-crystal" href="/superadmin/portals">Volver</a>
+  </div>
+</div>
+
+<div class="dash-card">
+  <form method="post"
+        action="<%= mode === 'create' ? '/superadmin/portals' : '/superadmin/portals/' + portal.id %>"
+        enctype="multipart/form-data"
+        class="form-grid">
+    <label>Nombre de la empresa *
+      <input type="text" name="name" value="<%= portal.name %>" required>
+    </label>
+    <label>Slug (URL interna)
+      <input type="text" name="slug" value="<%= portal.slug %>" placeholder="se genera del nombre">
+    </label>
+    <label>Contacto
+      <input type="text" name="contact_name" value="<%= portal.contact_name %>">
+    </label>
+    <label>Teléfono
+      <input type="text" name="phone" value="<%= portal.phone %>">
+    </label>
+    <label>Email
+      <input type="email" name="email" value="<%= portal.email %>">
+    </label>
+    <label>Activo
+      <span class="check-row">
+        <input type="checkbox" name="active" value="1" <%= portal.active ? 'checked' : '' %>>
+        Portal habilitado para login
+      </span>
+    </label>
+    <label class="span-2">Notas
+      <textarea name="notes" rows="2"><%= portal.notes %></textarea>
+    </label>
+
+    <label class="span-2">Logo del portal
+      <input type="file" name="logo" accept="image/png,image/jpeg,image/webp,image/gif">
+      <span class="muted small">JPG, PNG, WEBP o GIF · máx. 2 MB. Si no hay logo se usa Hunters 547.</span>
+    </label>
+    <% if (mode === 'edit' && portal.logo) { %>
+    <div class="span-2">
+      <p class="muted small">Logo actual</p>
+      <img class="logo-preview" src="<%= portal.logo %>" alt="Logo">
+    </div>
+    <% } %>
+
+    <h2 class="span-2 form-section">Credenciales del encargado</h2>
+    <% if (encargado) { %>
+      <label>Usuario (no se cambia)
+        <input type="text" value="<%= encargado.username %>" disabled>
+      </label>
+      <label>Nombre
+        <input type="text" name="encargado_name" value="<%= encargado.name %>">
+      </label>
+      <label class="span-2">Nueva contraseña (opcional)
+        <input type="password" name="encargado_password" autocomplete="new-password" minlength="6" placeholder="Dejar vacío para no cambiar">
+      </label>
+    <% } else { %>
+      <label>Nombre del encargado
+        <input type="text" name="encargado_name" placeholder="Nombre visible">
+      </label>
+      <label>Usuario * <%= mode === 'create' ? '' : '' %>
+        <input type="text" name="encargado_username" autocomplete="off" <%= mode === 'create' ? 'required' : '' %>>
+      </label>
+      <label class="span-2">Contraseña *
+        <input type="password" name="encargado_password" autocomplete="new-password" minlength="6" <%= mode === 'create' ? 'required' : '' %>>
+      </label>
+    <% } %>
+
+    <div class="span-2 align-end">
+      <button type="submit" class="btn btn-crystal-hot"><%= mode === 'create' ? 'Crear portal' : 'Guardar cambios' %></button>
+    </div>
+  </form>
+</div>
+<%- include('partials/foot') %>

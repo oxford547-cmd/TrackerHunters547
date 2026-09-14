@@ -1,0 +1,101 @@
+<%- include('partials/head', { dash: true, wide: true }) %>
+<div class="dash-head">
+  <div>
+    <h1 class="dash-title">Rendimiento de portales</h1>
+    <p class="muted">Agencia Hunters 547 · vista global de clientes y entregas</p>
+  </div>
+  <div class="dash-actions">
+    <a class="btn btn-crystal" href="/superadmin/portals">Ver portales</a>
+    <a class="btn btn-crystal-hot" href="/superadmin/portals/new">+ Nuevo portal</a>
+  </div>
+</div>
+
+<section class="kpi-grid">
+  <article class="kpi-card">
+    <p class="kpi-label">Portales</p>
+    <p class="kpi-value"><%= metrics.totalPortals %></p>
+    <p class="kpi-sub"><%= metrics.activePortals %> activos</p>
+  </article>
+  <article class="kpi-card kpi-hot">
+    <p class="kpi-label">Pedidos hoy</p>
+    <p class="kpi-value"><%= metrics.ordersToday %></p>
+    <p class="kpi-sub">semana: <%= metrics.ordersWeek %></p>
+  </article>
+  <article class="kpi-card">
+    <p class="kpi-label">Pedidos (7 días)</p>
+    <p class="kpi-value"><%= metrics.ordersWeek %></p>
+    <p class="kpi-sub">total histórico <%= metrics.totalOrders %></p>
+  </article>
+  <article class="kpi-card">
+    <p class="kpi-label">Entregas completadas</p>
+    <p class="kpi-value"><%= metrics.delivered %></p>
+    <p class="kpi-sub">estado Entregado</p>
+  </article>
+  <article class="kpi-card">
+    <p class="kpi-label">Choferes activos</p>
+    <p class="kpi-value"><%= metrics.activeChoferes %></p>
+    <p class="kpi-sub">en todos los portales</p>
+  </article>
+</section>
+
+<section class="charts-grid">
+  <article class="dash-card">
+    <div class="dash-card-head">
+      <h2>Pedidos (últimos 7 días)</h2>
+      <span class="dash-chip">Tendencia</span>
+    </div>
+    <div class="chart-box chart-box-lg">
+      <canvas id="chartTrend" aria-label="Pedidos por día"></canvas>
+    </div>
+  </article>
+  <article class="dash-card">
+    <div class="dash-card-head">
+      <h2>Por estado</h2>
+      <span class="dash-chip">Distribución</span>
+    </div>
+    <div class="chart-box chart-donut-wrap">
+      <canvas id="chartStatus" aria-label="Pedidos por estado"></canvas>
+    </div>
+  </article>
+</section>
+
+<section class="dash-card mb">
+  <div class="dash-card-head">
+    <h2>Pedidos por portal</h2>
+    <span class="dash-chip">Comparativo</span>
+  </div>
+  <div class="chart-box chart-box-md">
+    <canvas id="chartPortals" aria-label="Pedidos por portal"></canvas>
+  </div>
+</section>
+
+<h2 class="dash-section-title">Mini stats por portal</h2>
+<section class="mini-grid">
+  <% metrics.perPortal.forEach(p => { %>
+    <% const pct = metrics.totalOrders ? Math.round((p.orders / metrics.totalOrders) * 100) : 0; %>
+    <article class="mini-portal">
+      <div class="mini-portal-head">
+        <img class="mini-logo" src="<%= p.logo_path || defaultLogo %>" alt="">
+        <div>
+          <h3><%= p.name %></h3>
+          <p class="muted small"><code><%= p.slug %></code>
+            <% if (!p.active) { %><span class="badge badge-danger">Inactivo</span><% } %>
+          </p>
+        </div>
+      </div>
+      <div class="mini-stats">
+        <div><span><%= p.orders %></span> pedidos</div>
+        <div><span><%= p.orders_today %></span> hoy</div>
+        <div><span><%= p.delivered %></span> entregas</div>
+        <div><span><%= p.choferes %></span> choferes</div>
+      </div>
+      <div class="mini-bar" title="<%= pct %>% del total">
+        <div class="mini-bar-fill" style="width: <%= Math.max(pct, p.orders ? 8 : 0) %>%"></div>
+      </div>
+      <a class="btn btn-crystal btn-sm btn-block" href="/superadmin/portals/<%= p.id %>/edit">Editar</a>
+    </article>
+  <% }) %>
+</section>
+
+<script type="application/json" id="dash-data"><%- JSON.stringify(chartData).replace(/</g, '\\u003c') %></script>
+<%- include('partials/foot', { scripts: '<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script><script src="/assets/js/superadmin-dash.js"></script>' }) %>

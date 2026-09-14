@@ -1,0 +1,118 @@
+<%- include('partials/head', { withSidebar: true, wide: true }) %>
+<div class="dash-head">
+  <div>
+    <h1 class="dash-title lime">Dashboard</h1>
+    <p class="muted">
+      <% if (typeof portal !== 'undefined' && portal) { %><strong><%= portal.name %></strong> · <% } %>
+      Todos los pedidos del portal y métricas en vivo.
+    </p>
+  </div>
+  <div class="dash-actions">
+    <a class="btn btn-glass" href="/rastreo">Rastreo</a>
+    <a class="btn btn-glass-hot" href="/encargado/nuevo">+ Nuevo pedido</a>
+  </div>
+</div>
+
+<div class="kpi-grid kpi-grid-enc">
+  <article class="kpi-card kpi-lime">
+    <p class="kpi-label">Total pedidos</p>
+    <p class="kpi-value"><%= metrics.total %></p>
+    <p class="kpi-sub">hoy <%= metrics.ordersToday %> · sem <%= metrics.ordersWeek %></p>
+  </article>
+  <article class="kpi-card">
+    <p class="kpi-label">En camino</p>
+    <p class="kpi-value"><%= metrics.enCamino %></p>
+    <p class="kpi-sub">activos en ruta</p>
+  </article>
+  <article class="kpi-card">
+    <p class="kpi-label">Entregados hoy</p>
+    <p class="kpi-value"><%= metrics.deliveredToday %></p>
+    <p class="kpi-sub">semana: <%= metrics.deliveredWeek %></p>
+  </article>
+  <article class="kpi-card">
+    <p class="kpi-label">Entregados</p>
+    <p class="kpi-value"><%= metrics.delivered %></p>
+    <p class="kpi-sub">cancelados: <%= metrics.cancelados %></p>
+  </article>
+  <article class="kpi-card">
+    <p class="kpi-label">Equipo</p>
+    <p class="kpi-value"><%= metrics.choferes %></p>
+    <p class="kpi-sub"><%= metrics.clientes %> clientes</p>
+  </article>
+</div>
+
+<div class="status-chips mb">
+  <% Object.keys(statuses).forEach(key => { %>
+    <span class="status-chip">
+      <span class="badge <%= badgeClass(key) %>"><%= statusLabel(key) %></span>
+      <strong><%= metrics.byStatus[key] || 0 %></strong>
+    </span>
+  <% }) %>
+</div>
+
+<div class="card mb dash-card">
+  <div class="dash-card-head">
+    <h2>Pedidos del portal</h2>
+    <span class="dash-chip lime-chip"><%= orders.length %> registros</span>
+  </div>
+  <% if (!orders.length) { %>
+    <p class="muted">No hay pedidos. <a href="/encargado/nuevo">Crear el primero</a>.</p>
+  <% } else { %>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Nº pedido</th>
+          <th>Cliente</th>
+          <th>Estado</th>
+          <th>Chofer</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% orders.forEach(o => { %>
+        <tr>
+          <td>
+            <code><%= o.tracking_code %></code><br>
+            <a class="small" href="/rastreo?codigo=<%= encodeURIComponent(o.tracking_code) %>" target="_blank">Rastreo</a>
+          </td>
+          <td>
+            <strong><%= o.customer_name %></strong>
+            <div class="muted small"><%= o.phone %></div>
+            <div class="muted small"><%= o.address %></div>
+          </td>
+          <td><span class="badge <%= badgeClass(o.status) %>"><%= statusLabel(o.status) %></span></td>
+          <td>
+            <form method="post" action="/encargado/orders/<%= o.id %>/assign" class="inline-form">
+              <select name="chofer_id" <%= ['entregado','cancelado'].includes(o.status) ? 'disabled' : '' %>>
+                <option value="">—</option>
+                <% choferes.forEach(c => { %>
+                  <option value="<%= c.id %>" <%= o.chofer_id === c.id ? 'selected' : '' %>><%= c.name %></option>
+                <% }) %>
+              </select>
+              <% if (!['entregado','cancelado'].includes(o.status)) { %>
+                <button type="submit" class="btn btn-sm btn-glass">OK</button>
+              <% } %>
+            </form>
+          </td>
+          <td class="actions">
+            <% const nxt = nextStatus(o.status); %>
+            <% if (nxt) { %>
+              <form method="post" action="/encargado/orders/<%= o.id %>/advance" style="display:inline">
+                <button type="submit" class="btn btn-primary btn-sm">→ <%= statusLabel(nxt) %></button>
+              </form>
+            <% } %>
+            <% if (!['entregado','cancelado'].includes(o.status)) { %>
+              <form method="post" action="/encargado/orders/<%= o.id %>/cancel" style="display:inline" onsubmit="return confirm('¿Cancelar pedido?')">
+                <button type="submit" class="btn btn-danger btn-sm">Cancelar</button>
+              </form>
+            <% } %>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <% } %>
+</div>
+<%- include('partials/foot') %>

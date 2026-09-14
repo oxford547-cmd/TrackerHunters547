@@ -1,0 +1,18 @@
+<%- include('partials/head', { narrow: true }) %>
+<div class="page-head">
+  <h1>Iniciar sesión</h1>
+  <p class="muted">Superadmin, encargado, chofer o cliente — Hunters 547</p>
+</div>
+<div class="card">
+  <form method="post" action="/login" class="form-stack">
+    <label>Usuario
+      <input type="text" name="username" autocomplete="username" required autofocus>
+    </label>
+    <label>Contraseña
+      <input type="password" name="password" autocomplete="current-password" required>
+    </label>
+    <button type="submit" class="btn btn-primary">Entrar</button>
+  </form>
+  <p class="muted small mt">Demo: <code>superadmin</code> / <code>encargado</code> / <code>chofer</code> / <code>cliente</code> (ver README)</p>
+</div>
+<%- include('partials/foot') %>

@@ -1,0 +1,72 @@
+<%- include('partials/head', { withSidebar: true }) %>
+<div class="dash-head">
+  <div>
+    <h1 class="dash-title lime">Altas de clientes</h1>
+    <p class="muted">Clientes finales del portal. Opcional: usuario/contraseña para el portal cliente.</p>
+  </div>
+  <div class="dash-actions">
+    <a class="btn btn-glass" href="/encargado">Dashboard</a>
+  </div>
+</div>
+
+<div class="two-col">
+  <div class="card mb">
+    <h2>Clientes registrados</h2>
+    <% if (!customers.length) { %>
+      <p class="muted small">Aún no hay clientes.</p>
+    <% } else { %>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Teléfono</th>
+            <th>Login portal</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% customers.forEach(c => { %>
+          <tr>
+            <td>
+              <strong><%= c.name %></strong>
+              <% if (c.address) { %><div class="muted small"><%= c.address %></div><% } %>
+            </td>
+            <td><%= c.phone || '—' %></td>
+            <td>
+              <% if (c.login_username) { %>
+                <code><%= c.login_username %></code>
+              <% } else { %>
+                <span class="muted small">Sin acceso</span>
+              <% } %>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+  </div>
+
+  <div class="card mb">
+    <h2>Nuevo cliente</h2>
+    <form method="post" action="/encargado/clientes" class="form-stack">
+      <label>Nombre
+        <input type="text" name="name" required>
+      </label>
+      <label>Teléfono
+        <input type="text" name="phone">
+      </label>
+      <label>Dirección
+        <input type="text" name="address">
+      </label>
+      <label>Usuario portal (opcional)
+        <input type="text" name="username" autocomplete="off" placeholder="Si el cliente va a consultar pedidos">
+      </label>
+      <label>Contraseña (si hay usuario)
+        <input type="password" name="password" minlength="6" autocomplete="new-password">
+      </label>
+      <button type="submit" class="btn btn-glass-hot">Agregar cliente</button>
+    </form>
+  </div>
+</div>
+<%- include('partials/foot') %>

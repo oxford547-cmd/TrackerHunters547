@@ -1,0 +1,57 @@
+<%- include('partials/head', { narrow: true, leaflet: !!(order && order.status === 'en_camino') }) %>
+<div class="page-head">
+  <h1>Rastrear pedido</h1>
+  <p class="muted">Ingresa el código de rastreo (ej. H547-XXXXXX-AAMMDD)</p>
+</div>
+
+<div class="card mb">
+  <form method="get" action="/rastreo" class="form-row">
+    <input type="text" name="codigo" value="<%= codigo || '' %>" placeholder="Código de rastreo" required autofocus>
+    <button type="submit" class="btn btn-primary">Buscar</button>
+  </form>
+</div>
+
+<% if (codigo && !order) { %>
+  <div class="alert alert-danger">No se encontró un pedido con ese código.</div>
+<% } %>
+
+<% if (order) { %>
+<div class="card mb">
+  <h2><code><%= order.tracking_code %></code></h2>
+  <p><span class="badge <%= badgeClass(order.status) %>"><%= statusLabel(order.status) %></span></p>
+  <p><strong><%= order.customer_name %></strong><br>
+    <span class="muted"><%= order.address %></span>
+  </p>
+</div>
+
+<% if (order.status === 'en_camino') { %>
+<div class="card mb">
+  <h2>Mapa en vivo</h2>
+  <div id="map" class="map" data-codigo="<%= order.tracking_code %>"
+    <% if (lastLoc) { %>data-lat="<%= lastLoc.lat %>" data-lng="<%= lastLoc.lng %>"<% } %>></div>
+  <p class="muted small" id="loc-meta">
+    <% if (lastLoc) { %>Última actualización: <%= lastLoc.created_at %><% } else { %>Esperando ubicación del chofer…<% } %>
+  </p>
+</div>
+<% } else if (order.status === 'entregado') { %>
+  <div class="alert alert-ok">Pedido entregado<%= order.delivered_at ? ' · ' + order.delivered_at : '' %>.</div>
+<% } %>
+
+<div class="card">
+  <h2>Historial de estado</h2>
+  <ol class="timeline">
+    <% history.forEach(h => { %>
+      <li>
+        <span class="badge <%= badgeClass(h.status) %>"><%= statusLabel(h.status) %></span>
+        <span class="muted small"><%= h.created_at %></span>
+      </li>
+    <% }) %>
+  </ol>
+</div>
+<% } %>
+
+<% if (order && order.status === 'en_camino') { %>
+<%- include('partials/foot', { scripts: '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script><script src="/assets/js/rastreo.js"></script>' }) %>
+<% } else { %>
+<%- include('partials/foot') %>
+<% } %>

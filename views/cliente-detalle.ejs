@@ -1,0 +1,43 @@
+<%- include('partials/head', { narrow: true, leaflet: order.status === 'en_camino', withSidebar: true, activeNav: 'cliente' }) %>
+<div class="page-head">
+  <p><a href="/cliente">← Mis pedidos</a></p>
+  <h1><code><%= order.tracking_code %></code></h1>
+  <p><span class="badge <%= badgeClass(order.status) %>"><%= statusLabel(order.status) %></span></p>
+</div>
+
+<div class="card mb">
+  <p><strong><%= order.customer_name %></strong><br>
+    <%= order.phone %><br>
+    <%= order.address %>
+  </p>
+  <% if (order.notes) { %><p class="muted"><%= order.notes %></p><% } %>
+</div>
+
+<% if (order.status === 'en_camino') { %>
+<div class="card mb">
+  <h2>Ubicación en vivo</h2>
+  <div id="map" class="map" data-codigo="<%= order.tracking_code %>"></div>
+  <p class="muted small" id="loc-meta">
+    <% if (lastLoc) { %>Última: <%= lastLoc.created_at %><% } else { %>Esperando GPS del chofer…<% } %>
+  </p>
+</div>
+<% } %>
+
+<div class="card">
+  <h2>Historial</h2>
+  <ol class="timeline">
+    <% history.forEach(h => { %>
+      <li>
+        <span class="badge <%= badgeClass(h.status) %>"><%= statusLabel(h.status) %></span>
+        <span class="muted small"><%= h.created_at %></span>
+        <% if (h.changed_by_name) { %><span class="muted small">· <%= h.changed_by_name %></span><% } %>
+      </li>
+    <% }) %>
+  </ol>
+</div>
+
+<% if (order.status === 'en_camino') { %>
+<%- include('partials/foot', { scripts: '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script><script src="/assets/js/rastreo.js"></script>' }) %>
+<% } else { %>
+<%- include('partials/foot') %>
+<% } %>

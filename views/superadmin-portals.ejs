@@ -1,0 +1,65 @@
+<%- include('partials/head', { dash: true, wide: true }) %>
+<div class="dash-head">
+  <div>
+    <h1 class="dash-title">Portales / tenants</h1>
+    <p class="muted">Empresas cliente de la agencia Hunters 547</p>
+  </div>
+  <div class="dash-actions">
+    <a class="btn btn-crystal" href="/superadmin">Dashboard</a>
+    <a class="btn btn-crystal-hot" href="/superadmin/portals/new">+ Nuevo portal</a>
+  </div>
+</div>
+
+<div class="dash-card">
+  <% if (!portals.length) { %>
+    <p class="muted">Aún no hay portales. Crea el primero.</p>
+  <% } else { %>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Empresa</th>
+          <th>Contacto</th>
+          <th>Encargado</th>
+          <th>Pedidos</th>
+          <th>Estado</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% portals.forEach(p => { %>
+        <tr>
+          <td>
+            <div class="portal-cell">
+              <img class="mini-logo" src="<%= p.logo %>" alt="">
+              <div>
+                <strong><%= p.name %></strong>
+                <div class="muted small"><code><%= p.slug %></code></div>
+              </div>
+            </div>
+          </td>
+          <td>
+            <%= p.contact_name || '—' %><br>
+            <span class="muted small"><%= p.phone %></span>
+            <% if (p.email) { %><div class="muted small"><%= p.email %></div><% } %>
+          </td>
+          <td><code><%= p.encargado_username || '—' %></code></td>
+          <td><%= p.orders %></td>
+          <td>
+            <% if (p.active) { %>
+              <span class="badge badge-ok">Activo</span>
+            <% } else { %>
+              <span class="badge badge-danger">Inactivo</span>
+            <% } %>
+          </td>
+          <td>
+            <a class="btn btn-crystal btn-sm" href="/superadmin/portals/<%= p.id %>/edit">Editar</a>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <% } %>
+</div>
+<%- include('partials/foot') %>

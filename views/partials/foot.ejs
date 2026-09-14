@@ -1,0 +1,20 @@
+</main>
+<%
+  const _userFoot = (typeof user !== 'undefined') ? user : null;
+  const _sidebarRolesFoot = ['encargado', 'chofer', 'cliente'];
+  const _useSidebarFoot = (typeof withSidebar !== 'undefined' && withSidebar) ||
+    (_userFoot && _sidebarRolesFoot.includes(_userFoot.role));
+%>
+<% if (_useSidebarFoot) { %>
+  </div><!-- .app-main -->
+</div><!-- .app-shell -->
+<% } %>
+<footer class="site-footer">
+  <div class="container">
+    <p>Hunters 547 · Prototipo local de rastreo · <a href="https://www.hunters547.com" rel="noopener">hunters547.com</a></p>
+  </div>
+</footer>
+<script src="/assets/js/app.js"></script>
+<% if (typeof scripts !== 'undefined' && scripts) { %><%- scripts %><% } %>
+</body>
+</html>

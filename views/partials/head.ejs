@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= typeof title !== 'undefined' ? title + ' · ' : '' %><%= typeof brandName !== 'undefined' && brandName ? brandName : 'Hunters 547' %> Pedidos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <% if (typeof leaflet !== 'undefined' && leaflet) { %>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <% } %>
+</head>
+<%
+  const _user = (typeof user !== 'undefined') ? user : null;
+  const _flash = (typeof flash !== 'undefined') ? flash : null;
+  const _logo = (typeof brandLogo !== 'undefined' && brandLogo) ? brandLogo : '/assets/img/hunters547-logo.jpg';
+  const _brand = (typeof brandName !== 'undefined' && brandName) ? brandName : 'Hunters 547';
+  const _sidebarRoles = ['encargado', 'chofer', 'cliente'];
+  const _useSidebar = (typeof withSidebar !== 'undefined' && withSidebar) ||
+    (_user && _sidebarRoles.includes(_user.role));
+%>
+<body class="<%= typeof dash !== 'undefined' && dash ? 'theme-dash' : '' %> <%= _useSidebar ? 'has-sidebar' : '' %>">
+<header class="topbar">
+  <div class="topbar-inner <%= typeof wide !== 'undefined' && wide ? 'wide' : '' %> <%= _useSidebar ? 'with-side' : '' %>">
+    <% if (_useSidebar) { %>
+      <button type="button" class="btn-icon sidebar-toggle" id="sidebar-toggle" aria-label="Abrir menú" aria-controls="app-sidebar" aria-expanded="false">
+        <span class="hamburger" aria-hidden="true"></span>
+      </button>
+    <% } %>
+    <a class="brand" href="/">
+      <img class="brand-logo" src="<%= _logo %>" alt="<%= _brand %>">
+      <span><%= _user && _user.role === 'superadmin' ? 'Agencia Hunters 547' : 'Rastreo de pedidos' %></span>
+    </a>
+    <nav class="nav">
+      <% if (!_useSidebar) { %>
+        <a href="/rastreo">Rastreo</a>
+      <% } %>
+      <% if (_user) { %>
+        <% if (_user.role === 'superadmin') { %>
+          <a href="/superadmin">Dashboard</a>
+          <a href="/superadmin/portals">Portales</a>
+        <% } %>
+        <% if (!_useSidebar) { %>
+          <% if (_user.role === 'encargado') { %><a href="/encargado">Encargado</a><% } %>
+          <% if (_user.role === 'chofer') { %><a href="/chofer">Chofer</a><% } %>
+          <% if (_user.role === 'cliente') { %><a href="/cliente">Mis pedidos</a><% } %>
+        <% } %>
+        <span class="nav-user"><%= _user.name %> (<%= _user.role %>)<% if (typeof portal !== 'undefined' && portal) { %> · <%= portal.name %><% } %></span>
+        <form method="post" action="/logout" style="display:inline">
+          <button type="submit" class="btn <%= _user.role === 'superadmin' ? 'btn-crystal btn-sm' : 'btn-ghost btn-sm' %>">Salir</button>
+        </form>
+      <% } else { %>
+        <a href="/login">Entrar</a>
+      <% } %>
+    </nav>
+  </div>
+</header>
+<% if (_useSidebar) { %>
+<div class="app-shell">
+  <%- include('sidebar') %>
+  <div class="app-main">
+<% } %>
+<main class="container <%= typeof wide !== 'undefined' && wide ? 'wide' : '' %> <%= typeof narrow !== 'undefined' && narrow ? 'narrow' : '' %>">
+  <% if (_flash) { %>
+    <div class="alert alert-<%= _flash.type %>"><%= _flash.message %></div>
+  <% } %>

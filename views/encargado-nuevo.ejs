@@ -1,0 +1,64 @@
+<%- include('partials/head', { withSidebar: true }) %>
+<div class="dash-head">
+  <div>
+    <h1 class="dash-title lime">Nuevo pedido</h1>
+    <p class="muted">Asigna el <strong>número de pedido</strong> manualmente. Debe ser único en este portal.</p>
+  </div>
+  <div class="dash-actions">
+    <a class="btn btn-glass" href="/encargado">Volver al dashboard</a>
+  </div>
+</div>
+
+<div class="card mb">
+  <form method="post" action="/encargado/orders" class="form-grid">
+    <label class="span-2">Número de pedido (tracking)
+      <input type="text" name="tracking_code" required maxlength="64"
+             placeholder="Ej. <%= suggestedCode %>"
+             autocomplete="off"
+             pattern=".{3,64}"
+             title="3 a 64 caracteres, único en el portal">
+      <span class="muted small">Sugerencia: <code class="js-suggest-code"><%= suggestedCode %></code>
+        <button type="button" class="btn btn-sm btn-glass js-use-suggest" style="margin-left:.35rem">Usar sugerencia</button>
+      </span>
+    </label>
+    <label>Cliente existente
+      <select name="customer_id">
+        <option value="">— Nuevo / manual —</option>
+        <% customers.forEach(c => { %>
+          <option value="<%= c.id %>"><%= c.name %> (<%= c.phone %>)</option>
+        <% }) %>
+      </select>
+    </label>
+    <label>Nombre
+      <input type="text" name="customer_name" placeholder="Nombre del cliente">
+    </label>
+    <label>Teléfono
+      <input type="text" name="phone" placeholder="55…">
+    </label>
+    <label class="span-2">Dirección
+      <input type="text" name="address" placeholder="Calle, colonia, ciudad">
+    </label>
+    <label class="span-2">Notas
+      <textarea name="notes" rows="2" placeholder="Instrucciones de entrega"></textarea>
+    </label>
+    <label>Chofer
+      <select name="chofer_id">
+        <option value="">— Sin asignar —</option>
+        <% choferes.filter(c => c.active).forEach(c => { %>
+          <option value="<%= c.id %>"><%= c.name %></option>
+        <% }) %>
+      </select>
+    </label>
+    <div class="align-end">
+      <button type="submit" class="btn btn-glass-hot">Crear pedido</button>
+    </div>
+  </form>
+</div>
+<script>
+document.querySelector('.js-use-suggest')?.addEventListener('click', function () {
+  const code = document.querySelector('.js-suggest-code')?.textContent?.trim();
+  const input = document.querySelector('input[name="tracking_code"]');
+  if (code && input) input.value = code;
+});
+</script>
+<%- include('partials/foot') %>

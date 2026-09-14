@@ -1,0 +1,32 @@
+{
+  "name": "pedidoshunters547-node",
+  "version": "1.2.0",
+  "description": "Hunters 547 \u2014 SaaS multi-tenant de rastreo de pedidos (superadmin / encargado / chofer / cliente)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "seed": "node src/seed.js --force",
+    "init-db": "node src/seed.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "hunters547",
+    "pedidos",
+    "rastreo",
+    "express",
+    "sqlite",
+    "multi-tenant"
+  ],
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.7.0",
+    "ejs": "^3.1.10",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "multer": "^2.3.0"
+  }
+}
