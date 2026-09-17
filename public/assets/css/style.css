@@ -689,3 +689,50 @@ body.sidebar-collapsed .app-main { width: 100%; }
 @media (max-width: 700px) {
   .kpi-grid-enc { grid-template-columns: 1fr 1fr; }
 }
+
+/* Edgar UX: search + date presets */
+.search-input {
+  min-width: 12rem;
+  max-width: 22rem;
+  padding: .4rem .7rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,.25);
+  color: inherit;
+  font: inherit;
+}
+.date-presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem 1.25rem;
+  padding: .85rem 1rem;
+}
+.date-presets-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .4rem;
+}
+.date-manual-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: .5rem .75rem;
+}
+.date-manual-form label {
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+  font-size: .8rem;
+  color: var(--muted, #9aa);
+}
+.date-manual-form input[type="date"] {
+  padding: .35rem .5rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,.25);
+  color: inherit;
+  font: inherit;
+}

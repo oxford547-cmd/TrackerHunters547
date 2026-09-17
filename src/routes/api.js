@@ -93,6 +93,7 @@ router.post('/status', requireAuth, requirePortal, (req, res) => {
       status: 'entregado',
       phone: order.phone,
       customer_name: order.customer_name,
+      portal_id: order.portal_id,
     });
     return res.json({ ok: true, status: 'entregado', label: ORDER_STATUSES.entregado });
   }

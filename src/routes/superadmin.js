@@ -104,6 +104,7 @@ router.get('/portals/new', (req, res) => {
       email: '',
       notes: '',
       active: 1,
+      whatsapp_number: '',
     },
     encargado: null,
   });
@@ -116,6 +117,7 @@ router.post('/portals', withUpload, (req, res) => {
   const phone = String(req.body.phone || '').trim();
   const email = String(req.body.email || '').trim();
   const notes = String(req.body.notes || '').trim();
+  const whatsapp_number = String(req.body.whatsapp_number || '').trim();
   const active = req.body.active ? 1 : 0;
   const slugInput = String(req.body.slug || '').trim() || name;
   const encName = String(req.body.encargado_name || '').trim() || contact_name || name;
@@ -124,6 +126,10 @@ router.post('/portals', withUpload, (req, res) => {
 
   if (!name) {
     setFlash(req, 'danger', 'El nombre de la empresa es requerido.');
+    return res.redirect('/superadmin/portals/new');
+  }
+  if (!whatsapp_number) {
+    setFlash(req, 'danger', 'El número de WhatsApp para actualizaciones es requerido.');
     return res.redirect('/superadmin/portals/new');
   }
   if (!encUser || !encPass) {
@@ -144,10 +150,10 @@ router.post('/portals', withUpload, (req, res) => {
   const ts = now();
   const info = d
     .prepare(
-      `INSERT INTO portals (name, slug, logo_path, contact_name, phone, email, notes, active, created_at)
-       VALUES (?,?,?,?,?,?,?,?,?)`
+      `INSERT INTO portals (name, slug, logo_path, contact_name, phone, email, notes, active, created_at, whatsapp_number)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`
     )
-    .run(name, slug, null, contact_name, phone, email, notes, active, ts);
+    .run(name, slug, null, contact_name, phone, email, notes, active, ts, whatsapp_number);
 
   const portalId = info.lastInsertRowid;
   let logo_path = null;
@@ -207,11 +213,16 @@ router.post('/portals/:id', withUpload, (req, res) => {
   const phone = String(req.body.phone || '').trim();
   const email = String(req.body.email || '').trim();
   const notes = String(req.body.notes || '').trim();
+  const whatsapp_number = String(req.body.whatsapp_number || '').trim();
   const active = req.body.active ? 1 : 0;
   const slugInput = String(req.body.slug || '').trim() || name;
 
   if (!name) {
     setFlash(req, 'danger', 'El nombre de la empresa es requerido.');
+    return res.redirect(`/superadmin/portals/${id}/edit`);
+  }
+  if (!whatsapp_number) {
+    setFlash(req, 'danger', 'El número de WhatsApp para actualizaciones es requerido.');
     return res.redirect(`/superadmin/portals/${id}/edit`);
   }
 
@@ -230,9 +241,9 @@ router.post('/portals/:id', withUpload, (req, res) => {
 
   d.prepare(
     `UPDATE portals
-     SET name = ?, slug = ?, logo_path = ?, contact_name = ?, phone = ?, email = ?, notes = ?, active = ?
+     SET name = ?, slug = ?, logo_path = ?, contact_name = ?, phone = ?, email = ?, notes = ?, active = ?, whatsapp_number = ?
      WHERE id = ?`
-  ).run(name, slug, logo_path, contact_name, phone, email, notes, active, id);
+  ).run(name, slug, logo_path, contact_name, phone, email, notes, active, whatsapp_number, id);
 
   const encUser = String(req.body.encargado_username || '').trim();
   const encPass = String(req.body.encargado_password || '');

@@ -4,7 +4,7 @@
     <h1 class="dash-title lime">Dashboard</h1>
     <p class="muted">
       <% if (typeof portal !== 'undefined' && portal) { %><strong><%= portal.name %></strong> · <% } %>
-      Todos los pedidos del portal y métricas en vivo.
+      Pedidos y métricas · rango: <strong><%= range.label %></strong>
     </p>
   </div>
   <div class="dash-actions">
@@ -13,16 +13,42 @@
   </div>
 </div>
 
+<div class="date-presets card mb">
+  <div class="date-presets-row">
+    <span class="muted small">Periodo:</span>
+    <% const presets = [
+      { key: 'dia', label: 'Día' },
+      { key: 'semana', label: 'Semana' },
+      { key: 'mes', label: 'Mes' },
+      { key: 'anio', label: 'Año' },
+    ]; %>
+    <% presets.forEach(p => { %>
+      <a class="btn btn-sm <%= range.preset === p.key ? 'btn-glass-hot' : 'btn-glass' %>"
+         href="/encargado?range=<%= p.key %>"><%= p.label %></a>
+    <% }) %>
+  </div>
+  <form method="get" action="/encargado" class="date-manual-form">
+    <input type="hidden" name="range" value="custom">
+    <label>Desde
+      <input type="date" name="from" value="<%= range.preset === 'custom' ? String(range.from).slice(0,10) : (range.from || '').toString().slice(0,10) %>">
+    </label>
+    <label>Hasta
+      <input type="date" name="to" value="<%= range.toInclusive || '' %>">
+    </label>
+    <button type="submit" class="btn btn-sm btn-glass">Aplicar rango</button>
+  </form>
+</div>
+
 <div class="kpi-grid kpi-grid-enc">
   <article class="kpi-card kpi-lime">
-    <p class="kpi-label">Total pedidos</p>
+    <p class="kpi-label">Pedidos en periodo</p>
     <p class="kpi-value"><%= metrics.total %></p>
     <p class="kpi-sub">hoy <%= metrics.ordersToday %> · sem <%= metrics.ordersWeek %></p>
   </article>
   <article class="kpi-card">
     <p class="kpi-label">En camino</p>
     <p class="kpi-value"><%= metrics.enCamino %></p>
-    <p class="kpi-sub">activos en ruta</p>
+    <p class="kpi-sub">en el periodo</p>
   </article>
   <article class="kpi-card">
     <p class="kpi-label">Entregados hoy</p>
@@ -37,7 +63,7 @@
   <article class="kpi-card">
     <p class="kpi-label">Equipo</p>
     <p class="kpi-value"><%= metrics.choferes %></p>
-    <p class="kpi-sub"><%= metrics.clientes %> clientes</p>
+    <p class="kpi-sub"><%= metrics.clientes %> clientes activos</p>
   </article>
 </div>
 
@@ -53,10 +79,10 @@
 <div class="card mb dash-card">
   <div class="dash-card-head">
     <h2>Pedidos del portal</h2>
-    <span class="dash-chip lime-chip"><%= orders.length %> registros</span>
+    <span class="dash-chip lime-chip"><%= orders.length %> en periodo</span>
   </div>
   <% if (!orders.length) { %>
-    <p class="muted">No hay pedidos. <a href="/encargado/nuevo">Crear el primero</a>.</p>
+    <p class="muted">No hay pedidos en este rango. <a href="/encargado/nuevo">Crear pedido</a>.</p>
   <% } else { %>
   <div class="table-wrap">
     <table class="table">
@@ -75,6 +101,7 @@
           <td>
             <code><%= o.tracking_code %></code><br>
             <a class="small" href="/rastreo?codigo=<%= encodeURIComponent(o.tracking_code) %>" target="_blank">Rastreo</a>
+            <div class="muted small"><%= o.created_at %></div>
           </td>
           <td>
             <strong><%= o.customer_name %></strong>
@@ -86,8 +113,8 @@
             <form method="post" action="/encargado/orders/<%= o.id %>/assign" class="inline-form">
               <select name="chofer_id" <%= ['entregado','cancelado'].includes(o.status) ? 'disabled' : '' %>>
                 <option value="">—</option>
-                <% choferes.forEach(c => { %>
-                  <option value="<%= c.id %>" <%= o.chofer_id === c.id ? 'selected' : '' %>><%= c.name %></option>
+                <% choferes.filter(c => c.active || o.chofer_id === c.id).forEach(c => { %>
+                  <option value="<%= c.id %>" <%= o.chofer_id === c.id ? 'selected' : '' %>><%= c.name %><%= !c.active ? ' (bloq.)' : '' %></option>
                 <% }) %>
               </select>
               <% if (!['entregado','cancelado'].includes(o.status)) { %>

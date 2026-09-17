@@ -2,7 +2,7 @@
 <div class="dash-head">
   <div>
     <h1 class="dash-title lime">Altas de clientes</h1>
-    <p class="muted">Clientes finales del portal. Opcional: usuario/contraseña para el portal cliente.</p>
+    <p class="muted">Clientes finales del portal. Editar, activar/bloquear y buscar.</p>
   </div>
   <div class="dash-actions">
     <a class="btn btn-glass" href="/encargado">Dashboard</a>
@@ -11,33 +11,54 @@
 
 <div class="two-col">
   <div class="card mb">
-    <h2>Clientes registrados</h2>
+    <div class="dash-card-head" style="margin-bottom:.75rem">
+      <h2>Clientes registrados</h2>
+      <input type="search" class="search-input js-table-search" placeholder="Buscar nombre, tel, dirección…" data-table="clientes-table" aria-label="Buscar clientes">
+    </div>
     <% if (!customers.length) { %>
       <p class="muted small">Aún no hay clientes.</p>
     <% } else { %>
     <div class="table-wrap">
-      <table class="table">
+      <table class="table" id="clientes-table">
         <thead>
           <tr>
             <th>Nombre</th>
             <th>Teléfono</th>
-            <th>Login portal</th>
+            <th>Estado</th>
+            <th>Login</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           <% customers.forEach(c => { %>
-          <tr>
+          <tr data-search="<%= (c.name + ' ' + (c.phone||'') + ' ' + (c.address||'') + ' ' + (c.notes||'')).toLowerCase() %>">
             <td>
               <strong><%= c.name %></strong>
               <% if (c.address) { %><div class="muted small"><%= c.address %></div><% } %>
+              <% if (c.notes) { %><div class="muted small"><%= c.notes %></div><% } %>
             </td>
             <td><%= c.phone || '—' %></td>
+            <td>
+              <% if (c.active !== 0) { %>
+                <span class="badge badge-ok">Activo</span>
+              <% } else { %>
+                <span class="badge badge-danger">Bloqueado</span>
+              <% } %>
+            </td>
             <td>
               <% if (c.login_username) { %>
                 <code><%= c.login_username %></code>
               <% } else { %>
                 <span class="muted small">Sin acceso</span>
               <% } %>
+            </td>
+            <td class="actions">
+              <a class="btn btn-sm btn-glass" href="/encargado/clientes?edit=<%= c.id %>">Editar</a>
+              <form method="post" action="/encargado/clientes/<%= c.id %>/toggle" style="display:inline">
+                <button type="submit" class="btn btn-sm <%= c.active !== 0 ? 'btn-danger' : 'btn-glass-hot' %>">
+                  <%= c.active !== 0 ? 'Bloquear' : 'Activar' %>
+                </button>
+              </form>
             </td>
           </tr>
           <% }) %>
@@ -48,25 +69,75 @@
   </div>
 
   <div class="card mb">
-    <h2>Nuevo cliente</h2>
-    <form method="post" action="/encargado/clientes" class="form-stack">
-      <label>Nombre
-        <input type="text" name="name" required>
-      </label>
-      <label>Teléfono
-        <input type="text" name="phone">
-      </label>
-      <label>Dirección
-        <input type="text" name="address">
-      </label>
-      <label>Usuario portal (opcional)
-        <input type="text" name="username" autocomplete="off" placeholder="Si el cliente va a consultar pedidos">
-      </label>
-      <label>Contraseña (si hay usuario)
-        <input type="password" name="password" minlength="6" autocomplete="new-password">
-      </label>
-      <button type="submit" class="btn btn-glass-hot">Agregar cliente</button>
-    </form>
+    <h2><%= editing ? 'Editar cliente' : 'Nuevo cliente' %></h2>
+    <% if (editing) { %>
+      <p class="muted small">Editando <strong><%= editing.name %></strong> · <a href="/encargado/clientes">Cancelar</a></p>
+      <form method="post" action="/encargado/clientes/<%= editing.id %>" class="form-stack">
+        <label>Nombre
+          <input type="text" name="name" required value="<%= editing.name %>">
+        </label>
+        <label>Teléfono
+          <input type="text" name="phone" value="<%= editing.phone || '' %>">
+        </label>
+        <label>Dirección
+          <input type="text" name="address" value="<%= editing.address || '' %>">
+        </label>
+        <label>Notas
+          <textarea name="notes" rows="2"><%= editing.notes || '' %></textarea>
+        </label>
+        <% if (editing.login_username) { %>
+          <label>Usuario portal
+            <input type="text" value="<%= editing.login_username %>" disabled>
+          </label>
+          <label>Nueva contraseña (opcional)
+            <input type="password" name="password" minlength="6" autocomplete="new-password">
+          </label>
+        <% } else { %>
+          <label>Usuario portal (opcional)
+            <input type="text" name="username" autocomplete="off">
+          </label>
+          <label>Contraseña (si hay usuario)
+            <input type="password" name="password" minlength="6" autocomplete="new-password">
+          </label>
+        <% } %>
+        <button type="submit" class="btn btn-glass-hot">Guardar cambios</button>
+      </form>
+    <% } else { %>
+      <form method="post" action="/encargado/clientes" class="form-stack">
+        <label>Nombre
+          <input type="text" name="name" required>
+        </label>
+        <label>Teléfono
+          <input type="text" name="phone">
+        </label>
+        <label>Dirección
+          <input type="text" name="address">
+        </label>
+        <label>Notas
+          <textarea name="notes" rows="2" placeholder="Instrucciones / preferencias"></textarea>
+        </label>
+        <label>Usuario portal (opcional)
+          <input type="text" name="username" autocomplete="off" placeholder="Si el cliente va a consultar pedidos">
+        </label>
+        <label>Contraseña (si hay usuario)
+          <input type="password" name="password" minlength="6" autocomplete="new-password">
+        </label>
+        <button type="submit" class="btn btn-glass-hot">Agregar cliente</button>
+      </form>
+    <% } %>
   </div>
 </div>
+<script>
+document.querySelectorAll('.js-table-search').forEach((input) => {
+  const table = document.getElementById(input.dataset.table);
+  if (!table) return;
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    table.querySelectorAll('tbody tr').forEach((tr) => {
+      const hay = tr.getAttribute('data-search') || tr.textContent.toLowerCase();
+      tr.hidden = q && !hay.includes(q);
+    });
+  });
+});
+</script>
 <%- include('partials/foot') %>
