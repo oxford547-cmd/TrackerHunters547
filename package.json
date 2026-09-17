@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "seed": "node src/seed.js --force",
-    "init-db": "node src/seed.js"
+    "init-db": "node src/seed.js",
+    "test": "node --test test/*.test.js"
   },
   "engines": {
     "node": ">=18"

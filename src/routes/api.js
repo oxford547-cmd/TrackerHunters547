@@ -5,6 +5,7 @@ const { getDb, now } = require('../db');
 const { requireAuth, requireRole, requirePortal } = require('../middleware');
 const { ORDER_STATUSES } = require('../constants');
 const { getPortal, branding } = require('../portal');
+const { notifyOrderStatusAsync } = require('../services/whatsapp');
 
 const router = express.Router();
 
@@ -87,6 +88,12 @@ router.post('/status', requireAuth, requirePortal, (req, res) => {
     d.prepare(
       'INSERT INTO status_history (order_id, status, changed_by, notes, created_at) VALUES (?,?,?,?,?)'
     ).run(orderId, 'entregado', user.id, 'Marcado entregado por chofer', ts);
+    notifyOrderStatusAsync({
+      tracking_code: order.tracking_code,
+      status: 'entregado',
+      phone: order.phone,
+      customer_name: order.customer_name,
+    });
     return res.json({ ok: true, status: 'entregado', label: ORDER_STATUSES.entregado });
   }
 

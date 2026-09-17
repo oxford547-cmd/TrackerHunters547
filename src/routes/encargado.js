@@ -6,6 +6,7 @@ const { getDb, now, generateTrackingCode } = require('../db');
 const { requireAuth, requireRole, requirePortal, setFlash } = require('../middleware');
 const { ENCARGADO_FLOW, ORDER_STATUSES } = require('../constants');
 const { loadEncargadoMetrics } = require('../portal');
+const { notifyOrderStatusAsync } = require('../services/whatsapp');
 
 const router = express.Router();
 router.use(requireAuth, requireRole('encargado'), requirePortal);
@@ -184,6 +185,13 @@ router.post('/orders', (req, res) => {
       'INSERT INTO status_history (order_id, status, changed_by, notes, created_at) VALUES (?,?,?,?,?)'
     ).run(info.lastInsertRowid, 'pedido_colocado', req.session.user.id, 'Creado por encargado', ts);
 
+    notifyOrderStatusAsync({
+      tracking_code: code,
+      status: 'pedido_colocado',
+      phone,
+      customer_name,
+    });
+
     setFlash(req, 'ok', `Pedido creado: ${code}`);
     return res.redirect('/encargado');
   } catch (err) {
@@ -258,6 +266,12 @@ router.post('/orders/:id/advance', (req, res) => {
   d.prepare(
     'INSERT INTO status_history (order_id, status, changed_by, notes, created_at) VALUES (?,?,?,?,?)'
   ).run(id, nxt, req.session.user.id, '', ts);
+  notifyOrderStatusAsync({
+    tracking_code: order.tracking_code,
+    status: nxt,
+    phone: order.phone,
+    customer_name: order.customer_name,
+  });
   setFlash(req, 'ok', `Estado: ${ORDER_STATUSES[nxt]}`);
   res.redirect('/encargado');
 });
@@ -281,6 +295,12 @@ router.post('/orders/:id/cancel', (req, res) => {
   d.prepare(
     'INSERT INTO status_history (order_id, status, changed_by, notes, created_at) VALUES (?,?,?,?,?)'
   ).run(id, 'cancelado', req.session.user.id, 'Cancelado', ts);
+  notifyOrderStatusAsync({
+    tracking_code: order.tracking_code,
+    status: 'cancelado',
+    phone: order.phone,
+    customer_name: order.customer_name,
+  });
   setFlash(req, 'ok', 'Pedido cancelado.');
   res.redirect('/encargado');
 });
