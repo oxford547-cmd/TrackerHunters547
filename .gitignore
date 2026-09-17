@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Secrets and local env
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# SQLite databases (demo / local)
+*.sqlite
+*.sqlite-*
+*.db
+data/*.sqlite
+data/*.sqlite-*
+
+# Uploaded tenant files (logos / private assets)
+public/uploads/portals/*
+!public/uploads/portals/.gitkeep
+/uploads/
+
+# Logs and OS
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
