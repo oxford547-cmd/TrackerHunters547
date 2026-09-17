@@ -2,7 +2,7 @@
 <div class="dash-head">
   <div>
     <h1 class="dash-title lime">Altas de choferes</h1>
-    <p class="muted">Crea usuarios chofer con usuario y contraseña, solo para este portal.</p>
+    <p class="muted">Editar, activar/bloquear y buscar choferes de este portal.</p>
   </div>
   <div class="dash-actions">
     <a class="btn btn-glass" href="/encargado">Dashboard</a>
@@ -11,30 +11,42 @@
 
 <div class="two-col">
   <div class="card mb">
-    <h2>Choferes del portal</h2>
+    <div class="dash-card-head" style="margin-bottom:.75rem">
+      <h2>Choferes del portal</h2>
+      <input type="search" class="search-input js-table-search" placeholder="Buscar nombre o usuario…" data-table="choferes-table" aria-label="Buscar choferes">
+    </div>
     <% if (!choferes.length) { %>
       <p class="muted small">Aún no hay choferes.</p>
     <% } else { %>
     <div class="table-wrap">
-      <table class="table">
+      <table class="table" id="choferes-table">
         <thead>
           <tr>
             <th>Nombre</th>
             <th>Usuario</th>
             <th>Estado</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           <% choferes.forEach(c => { %>
-          <tr>
+          <tr data-search="<%= (c.name + ' ' + c.username).toLowerCase() %>">
             <td><strong><%= c.name %></strong></td>
             <td><code><%= c.username %></code></td>
             <td>
               <% if (c.active) { %>
                 <span class="badge badge-ok">Activo</span>
               <% } else { %>
-                <span class="badge badge-muted">Inactivo</span>
+                <span class="badge badge-danger">Bloqueado</span>
               <% } %>
+            </td>
+            <td class="actions">
+              <a class="btn btn-sm btn-glass" href="/encargado/choferes?edit=<%= c.id %>">Editar</a>
+              <form method="post" action="/encargado/choferes/<%= c.id %>/toggle" style="display:inline">
+                <button type="submit" class="btn btn-sm <%= c.active ? 'btn-danger' : 'btn-glass-hot' %>">
+                  <%= c.active ? 'Bloquear' : 'Activar' %>
+                </button>
+              </form>
             </td>
           </tr>
           <% }) %>
@@ -45,19 +57,48 @@
   </div>
 
   <div class="card mb">
-    <h2>Nuevo chofer</h2>
-    <form method="post" action="/encargado/choferes" class="form-stack">
-      <label>Nombre
-        <input type="text" name="name" required>
-      </label>
-      <label>Usuario
-        <input type="text" name="username" required autocomplete="off">
-      </label>
-      <label>Contraseña
-        <input type="password" name="password" required minlength="6" autocomplete="new-password">
-      </label>
-      <button type="submit" class="btn btn-glass-hot">Agregar chofer</button>
-    </form>
+    <h2><%= editing ? 'Editar chofer' : 'Nuevo chofer' %></h2>
+    <% if (editing) { %>
+      <p class="muted small">Editando <strong><%= editing.name %></strong> · <a href="/encargado/choferes">Cancelar</a></p>
+      <form method="post" action="/encargado/choferes/<%= editing.id %>" class="form-stack">
+        <label>Nombre
+          <input type="text" name="name" required value="<%= editing.name %>">
+        </label>
+        <label>Usuario
+          <input type="text" value="<%= editing.username %>" disabled>
+        </label>
+        <label>Nueva contraseña (opcional)
+          <input type="password" name="password" minlength="6" autocomplete="new-password">
+        </label>
+        <button type="submit" class="btn btn-glass-hot">Guardar cambios</button>
+      </form>
+    <% } else { %>
+      <form method="post" action="/encargado/choferes" class="form-stack">
+        <label>Nombre
+          <input type="text" name="name" required>
+        </label>
+        <label>Usuario
+          <input type="text" name="username" required autocomplete="off">
+        </label>
+        <label>Contraseña
+          <input type="password" name="password" required minlength="6" autocomplete="new-password">
+        </label>
+        <button type="submit" class="btn btn-glass-hot">Agregar chofer</button>
+      </form>
+    <% } %>
   </div>
 </div>
+<script>
+document.querySelectorAll('.js-table-search').forEach((input) => {
+  const table = document.getElementById(input.dataset.table);
+  if (!table) return;
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    table.querySelectorAll('tbody tr').forEach((tr) => {
+      const hay = tr.getAttribute('data-search') || tr.textContent.toLowerCase();
+      tr.hidden = q && !hay.includes(q);
+    });
+  });
+});
+</script>
 <%- include('partials/foot') %>

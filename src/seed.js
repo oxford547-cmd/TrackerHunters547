@@ -47,8 +47,8 @@ function seed(force = false) {
     const hashNorte = bcrypt.hashSync('norte123', 10);
 
     const insPortal = d.prepare(
-      `INSERT INTO portals (name, slug, logo_path, contact_name, phone, email, notes, active, created_at)
-       VALUES (?,?,?,?,?,?,?,?,?)`
+      `INSERT INTO portals (name, slug, logo_path, contact_name, phone, email, notes, active, created_at, whatsapp_number)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`
     );
     const portal1 = insPortal.run(
       'Hunters 547 Demo',
@@ -59,7 +59,8 @@ function seed(force = false) {
       'demo@hunters547.com',
       'Portal demo por defecto. Conserva los usuarios históricos.',
       1,
-      ts
+      ts,
+      '5511112233'
     ).lastInsertRowid;
     const portal2 = insPortal.run(
       'Logística Norte',
@@ -70,16 +71,19 @@ function seed(force = false) {
       'norte@example.com',
       'Segundo portal para demostrar aislamiento multi-tenant.',
       1,
-      ts
+      ts,
+      '8180001111'
     ).lastInsertRowid;
 
     const insCust = d.prepare(
-      'INSERT INTO customers (name, phone, address, created_at, portal_id) VALUES (?,?,?,?,?)'
+      'INSERT INTO customers (name, phone, address, notes, active, created_at, portal_id) VALUES (?,?,?,?,?,?,?)'
     );
     const cust1 = insCust.run(
       'Cliente Demo García',
       '5512345678',
       'Av. Reforma 100, Col. Centro, CDMX',
+      'Entregar en recepción',
+      1,
       ts,
       portal1
     ).lastInsertRowid;
@@ -87,6 +91,8 @@ function seed(force = false) {
       'Otro Cliente Pérez',
       '5587654321',
       'Insurgentes Sur 200, CDMX',
+      '',
+      1,
       ts,
       portal1
     ).lastInsertRowid;
@@ -94,6 +100,8 @@ function seed(force = false) {
       'Cliente Norte López',
       '8185550101',
       'Av. Constitución 50, Monterrey, NL',
+      'Horario 9–18 h',
+      1,
       ts,
       portal2
     ).lastInsertRowid;

@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 const { getDb, now, generateTrackingCode } = require('../db');
 const { requireAuth, requireRole, requirePortal, setFlash } = require('../middleware');
 const { ENCARGADO_FLOW, ORDER_STATUSES } = require('../constants');
-const { loadEncargadoMetrics } = require('../portal');
+const { loadEncargadoMetrics, resolveDateRange } = require('../portal');
 const { notifyOrderStatusAsync } = require('../services/whatsapp');
 
 const router = express.Router();
@@ -36,8 +36,8 @@ function loadChoferes(d, pid) {
 function loadCustomers(d, pid) {
   return d
     .prepare(
-      `SELECT c.id, c.name, c.phone, c.address, c.created_at,
-              u.username AS login_username, u.id AS user_id
+      `SELECT c.id, c.name, c.phone, c.address, c.notes, c.active, c.created_at,
+              u.username AS login_username, u.id AS user_id, u.active AS login_active
        FROM customers c
        LEFT JOIN users u ON u.cliente_id = c.id AND u.role = 'cliente' AND u.portal_id = c.portal_id
        WHERE c.portal_id = ?
@@ -46,7 +46,18 @@ function loadCustomers(d, pid) {
     .all(pid);
 }
 
-function loadOrders(d, pid) {
+function loadOrders(d, pid, range) {
+  if (range && range.from && range.toExclusive) {
+    return d
+      .prepare(
+        `SELECT o.*, u.name AS chofer_name
+         FROM orders o
+         LEFT JOIN users u ON u.id = o.chofer_id
+         WHERE o.portal_id = ? AND o.created_at >= ? AND o.created_at < ?
+         ORDER BY o.created_at DESC`
+      )
+      .all(pid, range.from, range.toExclusive);
+  }
   return d
     .prepare(
       `SELECT o.*, u.name AS chofer_name
@@ -65,19 +76,26 @@ function normalizeTrackingCode(raw) {
     .toUpperCase();
 }
 
-/** Dashboard: all portal orders + metrics */
+function parseRangeFromQuery(query) {
+  const preset = String(query.range || query.preset || 'semana').toLowerCase();
+  return resolveDateRange(preset, query.from, query.to);
+}
+
+/** Dashboard: all portal orders + metrics + date presets */
 router.get('/', (req, res) => {
   const d = getDb();
   const pid = portalIdOf(req);
-  const orders = loadOrders(d, pid);
+  const range = parseRangeFromQuery(req.query);
+  const orders = loadOrders(d, pid, range);
   const choferes = loadChoferes(d, pid);
-  const metrics = loadEncargadoMetrics(pid);
+  const metrics = loadEncargadoMetrics(pid, range);
 
   res.render('encargado', {
     title: 'Dashboard encargado',
     orders,
     choferes,
     metrics,
+    range,
     statuses: ORDER_STATUSES,
     nextStatus,
     withSidebar: true,
@@ -89,9 +107,10 @@ router.get('/', (req, res) => {
 router.get('/nuevo', (req, res) => {
   const d = getDb();
   const pid = portalIdOf(req);
+  const customers = loadCustomers(d, pid).filter((c) => c.active !== 0);
   res.render('encargado-nuevo', {
     title: 'Nuevo pedido',
-    customers: loadCustomers(d, pid),
+    customers,
     choferes: loadChoferes(d, pid),
     suggestedCode: generateTrackingCode(),
     withSidebar: true,
@@ -106,7 +125,7 @@ router.post('/orders', (req, res) => {
   let customer_name = String(req.body.customer_name || '').trim();
   let phone = String(req.body.phone || '').trim();
   let address = String(req.body.address || '').trim();
-  const notes = String(req.body.notes || '').trim();
+  let notes = String(req.body.notes || '').trim();
   let chofer_id = req.body.chofer_id ? Number(req.body.chofer_id) : null;
   const code = normalizeTrackingCode(req.body.tracking_code);
 
@@ -130,11 +149,18 @@ router.post('/orders', (req, res) => {
   }
 
   if (customerId) {
-    const c = d.prepare('SELECT * FROM customers WHERE id = ? AND portal_id = ?').get(customerId, pid);
+    const c = d
+      .prepare('SELECT * FROM customers WHERE id = ? AND portal_id = ?')
+      .get(customerId, pid);
     if (c) {
+      if (c.active === 0) {
+        setFlash(req, 'danger', 'Ese cliente está bloqueado.');
+        return res.redirect('/encargado/nuevo');
+      }
       customer_name = customer_name || c.name;
       phone = phone || c.phone;
       address = address || c.address;
+      notes = notes || c.notes || '';
     } else {
       setFlash(req, 'danger', 'Cliente no pertenece a este portal.');
       return res.redirect('/encargado/nuevo');
@@ -190,6 +216,7 @@ router.post('/orders', (req, res) => {
       status: 'pedido_colocado',
       phone,
       customer_name,
+      portal_id: pid,
     });
 
     setFlash(req, 'ok', `Pedido creado: ${code}`);
@@ -219,10 +246,10 @@ router.post('/orders/:id/assign', (req, res) => {
   }
   if (chofer_id) {
     const ch = d
-      .prepare("SELECT id FROM users WHERE id = ? AND role = 'chofer' AND portal_id = ?")
+      .prepare("SELECT id FROM users WHERE id = ? AND role = 'chofer' AND portal_id = ? AND active = 1")
       .get(chofer_id, pid);
     if (!ch) {
-      setFlash(req, 'danger', 'Chofer no pertenece a este portal.');
+      setFlash(req, 'danger', 'Chofer no pertenece a este portal o está bloqueado.');
       return res.redirect('/encargado');
     }
   } else {
@@ -271,6 +298,7 @@ router.post('/orders/:id/advance', (req, res) => {
     status: nxt,
     phone: order.phone,
     customer_name: order.customer_name,
+    portal_id: pid,
   });
   setFlash(req, 'ok', `Estado: ${ORDER_STATUSES[nxt]}`);
   res.redirect('/encargado');
@@ -300,6 +328,7 @@ router.post('/orders/:id/cancel', (req, res) => {
     status: 'cancelado',
     phone: order.phone,
     customer_name: order.customer_name,
+    portal_id: pid,
   });
   setFlash(req, 'ok', 'Pedido cancelado.');
   res.redirect('/encargado');
@@ -309,9 +338,13 @@ router.post('/orders/:id/cancel', (req, res) => {
 router.get('/choferes', (req, res) => {
   const d = getDb();
   const pid = portalIdOf(req);
+  const editId = req.query.edit ? Number(req.query.edit) : null;
+  const choferes = loadChoferes(d, pid);
+  const editing = editId ? choferes.find((c) => c.id === editId) || null : null;
   res.render('encargado-choferes', {
     title: 'Altas choferes',
-    choferes: loadChoferes(d, pid),
+    choferes,
+    editing,
     withSidebar: true,
     activeNav: 'choferes',
   });
@@ -344,13 +377,66 @@ router.post('/choferes', (req, res) => {
   res.redirect('/encargado/choferes');
 });
 
+router.post('/choferes/:id', (req, res) => {
+  const d = getDb();
+  const pid = portalIdOf(req);
+  const id = Number(req.params.id);
+  const ch = d
+    .prepare("SELECT * FROM users WHERE id = ? AND role = 'chofer' AND portal_id = ?")
+    .get(id, pid);
+  if (!ch) {
+    setFlash(req, 'danger', 'Chofer no encontrado.');
+    return res.redirect('/encargado/choferes');
+  }
+  const name = String(req.body.name || '').trim();
+  const password = String(req.body.password || '');
+  if (!name) {
+    setFlash(req, 'danger', 'Nombre requerido.');
+    return res.redirect(`/encargado/choferes?edit=${id}`);
+  }
+  d.prepare('UPDATE users SET name = ? WHERE id = ? AND portal_id = ?').run(name, id, pid);
+  if (password) {
+    if (password.length < 6) {
+      setFlash(req, 'danger', 'La contraseña debe tener al menos 6 caracteres.');
+      return res.redirect(`/encargado/choferes?edit=${id}`);
+    }
+    d.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(
+      bcrypt.hashSync(password, 10),
+      id
+    );
+  }
+  setFlash(req, 'ok', `Chofer “${name}” actualizado.`);
+  res.redirect('/encargado/choferes');
+});
+
+router.post('/choferes/:id/toggle', (req, res) => {
+  const d = getDb();
+  const pid = portalIdOf(req);
+  const id = Number(req.params.id);
+  const ch = d
+    .prepare("SELECT id, active, name FROM users WHERE id = ? AND role = 'chofer' AND portal_id = ?")
+    .get(id, pid);
+  if (!ch) {
+    setFlash(req, 'danger', 'Chofer no encontrado.');
+    return res.redirect('/encargado/choferes');
+  }
+  const next = ch.active ? 0 : 1;
+  d.prepare('UPDATE users SET active = ? WHERE id = ?').run(next, id);
+  setFlash(req, 'ok', next ? `“${ch.name}” activo.` : `“${ch.name}” bloqueado.`);
+  res.redirect('/encargado/choferes');
+});
+
 /** Altas clientes */
 router.get('/clientes', (req, res) => {
   const d = getDb();
   const pid = portalIdOf(req);
+  const editId = req.query.edit ? Number(req.query.edit) : null;
+  const customers = loadCustomers(d, pid);
+  const editing = editId ? customers.find((c) => c.id === editId) || null : null;
   res.render('encargado-clientes', {
     title: 'Altas clientes',
-    customers: loadCustomers(d, pid),
+    customers,
+    editing,
     withSidebar: true,
     activeNav: 'clientes',
   });
@@ -362,6 +448,7 @@ router.post('/clientes', (req, res) => {
   const name = String(req.body.name || '').trim();
   const phone = String(req.body.phone || '').trim();
   const address = String(req.body.address || '').trim();
+  const notes = String(req.body.notes || '').trim();
   const username = String(req.body.username || '').trim();
   const password = String(req.body.password || '');
 
@@ -373,9 +460,9 @@ router.post('/clientes', (req, res) => {
   const ts = now();
   const info = d
     .prepare(
-      'INSERT INTO customers (name, phone, address, created_at, portal_id) VALUES (?,?,?,?,?)'
+      'INSERT INTO customers (name, phone, address, notes, active, created_at, portal_id) VALUES (?,?,?,?,?,?,?)'
     )
-    .run(name, phone, address, ts, pid);
+    .run(name, phone, address, notes, 1, ts, pid);
 
   if (username) {
     if (!password || password.length < 6) {
@@ -398,6 +485,88 @@ router.post('/clientes', (req, res) => {
   }
 
   setFlash(req, 'ok', `Cliente “${name}” creado.`);
+  res.redirect('/encargado/clientes');
+});
+
+router.post('/clientes/:id', (req, res) => {
+  const d = getDb();
+  const pid = portalIdOf(req);
+  const id = Number(req.params.id);
+  const c = d.prepare('SELECT * FROM customers WHERE id = ? AND portal_id = ?').get(id, pid);
+  if (!c) {
+    setFlash(req, 'danger', 'Cliente no encontrado.');
+    return res.redirect('/encargado/clientes');
+  }
+  const name = String(req.body.name || '').trim();
+  const phone = String(req.body.phone || '').trim();
+  const address = String(req.body.address || '').trim();
+  const notes = String(req.body.notes || '').trim();
+  if (!name) {
+    setFlash(req, 'danger', 'Nombre requerido.');
+    return res.redirect(`/encargado/clientes?edit=${id}`);
+  }
+  d.prepare(
+    'UPDATE customers SET name = ?, phone = ?, address = ?, notes = ? WHERE id = ? AND portal_id = ?'
+  ).run(name, phone, address, notes, id, pid);
+
+  const loginUser = d
+    .prepare("SELECT id FROM users WHERE cliente_id = ? AND role = 'cliente' AND portal_id = ?")
+    .get(id, pid);
+  if (loginUser) {
+    d.prepare('UPDATE users SET name = ? WHERE id = ?').run(name, loginUser.id);
+  }
+
+  const password = String(req.body.password || '');
+  const username = String(req.body.username || '').trim();
+  if (loginUser && password) {
+    if (password.length < 6) {
+      setFlash(req, 'danger', 'La contraseña debe tener al menos 6 caracteres.');
+      return res.redirect(`/encargado/clientes?edit=${id}`);
+    }
+    d.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(
+      bcrypt.hashSync(password, 10),
+      loginUser.id
+    );
+  } else if (!loginUser && username) {
+    if (!password || password.length < 6) {
+      setFlash(req, 'danger', 'Para dar acceso, usuario y contraseña (mín. 6) son requeridos.');
+      return res.redirect(`/encargado/clientes?edit=${id}`);
+    }
+    const exists = d.prepare('SELECT id FROM users WHERE username = ?').get(username);
+    if (exists) {
+      setFlash(req, 'danger', 'Ese usuario ya existe.');
+      return res.redirect(`/encargado/clientes?edit=${id}`);
+    }
+    d.prepare(
+      `INSERT INTO users (username, password_hash, role, name, cliente_id, active, created_at, portal_id)
+       VALUES (?,?,?,?,?,?,?,?)`
+    ).run(username, bcrypt.hashSync(password, 10), 'cliente', name, id, 1, now(), pid);
+  }
+
+  setFlash(req, 'ok', `Cliente “${name}” actualizado.`);
+  res.redirect('/encargado/clientes');
+});
+
+router.post('/clientes/:id/toggle', (req, res) => {
+  const d = getDb();
+  const pid = portalIdOf(req);
+  const id = Number(req.params.id);
+  const c = d
+    .prepare('SELECT id, name, active FROM customers WHERE id = ? AND portal_id = ?')
+    .get(id, pid);
+  if (!c) {
+    setFlash(req, 'danger', 'Cliente no encontrado.');
+    return res.redirect('/encargado/clientes');
+  }
+  const next = c.active ? 0 : 1;
+  d.prepare('UPDATE customers SET active = ? WHERE id = ?').run(next, id);
+  const login = d
+    .prepare("SELECT id FROM users WHERE cliente_id = ? AND role = 'cliente' AND portal_id = ?")
+    .get(id, pid);
+  if (login) {
+    d.prepare('UPDATE users SET active = ? WHERE id = ?').run(next, login.id);
+  }
+  setFlash(req, 'ok', next ? `“${c.name}” activo.` : `“${c.name}” bloqueado.`);
   res.redirect('/encargado/clientes');
 });
 

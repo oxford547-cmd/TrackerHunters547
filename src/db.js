@@ -107,7 +107,8 @@ function ensureSchema() {
       email TEXT NOT NULL DEFAULT '',
       notes TEXT NOT NULL DEFAULT '',
       active INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL
+      created_at TEXT NOT NULL,
+      whatsapp_number TEXT NOT NULL DEFAULT ''
     );
 
     CREATE TABLE IF NOT EXISTS customers (
@@ -115,6 +116,8 @@ function ensureSchema() {
       name TEXT NOT NULL,
       phone TEXT NOT NULL DEFAULT '',
       address TEXT NOT NULL DEFAULT '',
+      notes TEXT NOT NULL DEFAULT '',
+      active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL
     );
 
@@ -173,6 +176,9 @@ function ensureSchema() {
   addColumnIfMissing(d, 'users', 'portal_id', 'INTEGER');
   addColumnIfMissing(d, 'orders', 'portal_id', 'INTEGER');
   addColumnIfMissing(d, 'customers', 'portal_id', 'INTEGER');
+  addColumnIfMissing(d, 'customers', 'notes', "TEXT NOT NULL DEFAULT ''");
+  addColumnIfMissing(d, 'customers', 'active', 'INTEGER NOT NULL DEFAULT 1');
+  addColumnIfMissing(d, 'portals', 'whatsapp_number', "TEXT NOT NULL DEFAULT ''");
 
   d.exec(`
     CREATE INDEX IF NOT EXISTS idx_users_portal ON users(portal_id);

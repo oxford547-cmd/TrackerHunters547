@@ -153,13 +153,99 @@ function loadDashboard() {
 }
 
 
-function loadEncargadoMetrics(portalId) {
+/** Build { from, toExclusive } ISO-ish timestamps for dashboard presets. */
+function resolveDateRange(preset, fromStr, toStr) {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const ymd = (d) =>
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const startOfDay = (d) => ymd(d) + ' 00:00:00';
+  const nextDay = (d) => {
+    const x = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+    return startOfDay(x);
+  };
+
+  const p = String(preset || 'semana').toLowerCase();
+  if (p === 'custom' || p === 'manual') {
+    const from = String(fromStr || '').trim();
+    const to = String(toStr || '').trim();
+    if (from && to) {
+      const fromDay = from.slice(0, 10);
+      const toDay = to.slice(0, 10);
+      return {
+        preset: 'custom',
+        from: fromDay + ' 00:00:00',
+        toExclusive: nextDay(new Date(toDay + 'T12:00:00')),
+        toInclusive: toDay,
+        label: `${fromDay} → ${toDay}`,
+      };
+    }
+  }
+
+  let fromDate;
+  let label;
+  if (p === 'dia' || p === 'día' || p === 'day') {
+    fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    label = 'Hoy';
+    return {
+      preset: 'dia',
+      from: startOfDay(fromDate),
+      toExclusive: nextDay(fromDate),
+      toInclusive: ymd(fromDate),
+      label,
+    };
+  }
+  if (p === 'mes' || p === 'month') {
+    fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    label = 'Este mes';
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return {
+      preset: 'mes',
+      from: startOfDay(fromDate),
+      toExclusive: startOfDay(end),
+      toInclusive: ymd(last),
+      label,
+    };
+  }
+  if (p === 'anio' || p === 'año' || p === 'year') {
+    fromDate = new Date(now.getFullYear(), 0, 1);
+    label = 'Este año';
+    const end = new Date(now.getFullYear() + 1, 0, 1);
+    return {
+      preset: 'anio',
+      from: startOfDay(fromDate),
+      toExclusive: startOfDay(end),
+      toInclusive: `${now.getFullYear()}-12-31`,
+      label,
+    };
+  }
+  // default semana (last 7 days including today)
+  fromDate = new Date(now.getTime() - 6 * 86400000);
+  fromDate = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
+  label = 'Últimos 7 días';
+  return {
+    preset: 'semana',
+    from: startOfDay(fromDate),
+    toExclusive: nextDay(now),
+    toInclusive: ymd(now),
+    label,
+  };
+}
+
+function loadEncargadoMetrics(portalId, rangeOpts) {
   const d = getDb();
   const pid = Number(portalId);
   const today = startOfToday();
   const weekStart = daysAgoTs(7).slice(0, 10) + ' 00:00:00';
+  const range = rangeOpts && rangeOpts.from
+    ? rangeOpts
+    : resolveDateRange(rangeOpts && rangeOpts.preset, rangeOpts && rangeOpts.fromStr, rangeOpts && rangeOpts.toStr);
 
-  const total = d.prepare('SELECT COUNT(*) AS c FROM orders WHERE portal_id = ?').get(pid).c;
+  const inRange = 'portal_id = ? AND created_at >= ? AND created_at < ?';
+  const total = d
+    .prepare(`SELECT COUNT(*) AS c FROM orders WHERE ${inRange}`)
+    .get(pid, range.from, range.toExclusive).c;
   const ordersToday = d
     .prepare('SELECT COUNT(*) AS c FROM orders WHERE portal_id = ? AND created_at >= ?')
     .get(pid, today).c;
@@ -167,8 +253,10 @@ function loadEncargadoMetrics(portalId) {
     .prepare('SELECT COUNT(*) AS c FROM orders WHERE portal_id = ? AND created_at >= ?')
     .get(pid, weekStart).c;
   const enCamino = d
-    .prepare("SELECT COUNT(*) AS c FROM orders WHERE portal_id = ? AND status = 'en_camino'")
-    .get(pid).c;
+    .prepare(
+      `SELECT COUNT(*) AS c FROM orders WHERE ${inRange} AND status = 'en_camino'`
+    )
+    .get(pid, range.from, range.toExclusive).c;
   const deliveredToday = d
     .prepare(
       `SELECT COUNT(*) AS c FROM orders
@@ -184,19 +272,27 @@ function loadEncargadoMetrics(portalId) {
     )
     .get(pid, weekStart).c;
   const delivered = d
-    .prepare("SELECT COUNT(*) AS c FROM orders WHERE portal_id = ? AND status = 'entregado'")
-    .get(pid).c;
+    .prepare(
+      `SELECT COUNT(*) AS c FROM orders WHERE ${inRange} AND status = 'entregado'`
+    )
+    .get(pid, range.from, range.toExclusive).c;
   const cancelados = d
-    .prepare("SELECT COUNT(*) AS c FROM orders WHERE portal_id = ? AND status = 'cancelado'")
-    .get(pid).c;
+    .prepare(
+      `SELECT COUNT(*) AS c FROM orders WHERE ${inRange} AND status = 'cancelado'`
+    )
+    .get(pid, range.from, range.toExclusive).c;
   const choferes = d
     .prepare("SELECT COUNT(*) AS c FROM users WHERE portal_id = ? AND role = 'chofer' AND active = 1")
     .get(pid).c;
-  const clientes = d.prepare('SELECT COUNT(*) AS c FROM customers WHERE portal_id = ?').get(pid).c;
+  const clientes = d
+    .prepare('SELECT COUNT(*) AS c FROM customers WHERE portal_id = ? AND COALESCE(active, 1) = 1')
+    .get(pid).c;
 
   const byStatusRows = d
-    .prepare('SELECT status, COUNT(*) AS c FROM orders WHERE portal_id = ? GROUP BY status')
-    .all(pid);
+    .prepare(
+      `SELECT status, COUNT(*) AS c FROM orders WHERE ${inRange} GROUP BY status`
+    )
+    .all(pid, range.from, range.toExclusive);
   const byStatus = {};
   for (const r of byStatusRows) byStatus[r.status] = r.c;
 
@@ -212,6 +308,7 @@ function loadEncargadoMetrics(portalId) {
     choferes,
     clientes,
     byStatus,
+    range,
   };
 }
 
@@ -229,4 +326,5 @@ module.exports = {
   startOfToday,
   loadDashboard,
   loadEncargadoMetrics,
+  resolveDateRange,
 };

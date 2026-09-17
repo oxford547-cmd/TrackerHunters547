@@ -10,7 +10,7 @@
 </div>
 
 <div class="card mb">
-  <form method="post" action="/encargado/orders" class="form-grid">
+  <form method="post" action="/encargado/orders" class="form-grid" id="nuevo-pedido-form">
     <label class="span-2">Número de pedido (tracking)
       <input type="text" name="tracking_code" required maxlength="64"
              placeholder="Ej. <%= suggestedCode %>"
@@ -21,25 +21,32 @@
         <button type="button" class="btn btn-sm btn-glass js-use-suggest" style="margin-left:.35rem">Usar sugerencia</button>
       </span>
     </label>
-    <label>Cliente existente
-      <select name="customer_id">
-        <option value="">— Nuevo / manual —</option>
+    <label>Cliente existente (alta)
+      <select name="customer_id" id="customer-select">
+        <option value="" data-name="" data-phone="" data-address="" data-notes="">— Nuevo / manual —</option>
         <% customers.forEach(c => { %>
-          <option value="<%= c.id %>"><%= c.name %> (<%= c.phone %>)</option>
+          <option value="<%= c.id %>"
+                  data-name="<%= c.name %>"
+                  data-phone="<%= c.phone || '' %>"
+                  data-address="<%= c.address || '' %>"
+                  data-notes="<%= c.notes || '' %>">
+            <%= c.name %> (<%= c.phone || 'sin tel' %>)
+          </option>
         <% }) %>
       </select>
+      <span class="muted small">Al elegir un cliente se rellenan contacto, teléfono, dirección y notas.</span>
     </label>
-    <label>Nombre
-      <input type="text" name="customer_name" placeholder="Nombre del cliente">
+    <label>Nombre / contacto
+      <input type="text" name="customer_name" id="field-name" placeholder="Nombre del cliente">
     </label>
     <label>Teléfono
-      <input type="text" name="phone" placeholder="55…">
+      <input type="text" name="phone" id="field-phone" placeholder="55… o +52…">
     </label>
     <label class="span-2">Dirección
-      <input type="text" name="address" placeholder="Calle, colonia, ciudad">
+      <input type="text" name="address" id="field-address" placeholder="Calle, colonia, ciudad">
     </label>
     <label class="span-2">Notas
-      <textarea name="notes" rows="2" placeholder="Instrucciones de entrega"></textarea>
+      <textarea name="notes" id="field-notes" rows="2" placeholder="Instrucciones de entrega"></textarea>
     </label>
     <label>Chofer
       <select name="chofer_id">
@@ -60,5 +67,23 @@ document.querySelector('.js-use-suggest')?.addEventListener('click', function ()
   const input = document.querySelector('input[name="tracking_code"]');
   if (code && input) input.value = code;
 });
+
+(function autofillFromAlta() {
+  const sel = document.getElementById('customer-select');
+  if (!sel) return;
+  const name = document.getElementById('field-name');
+  const phone = document.getElementById('field-phone');
+  const address = document.getElementById('field-address');
+  const notes = document.getElementById('field-notes');
+  function apply() {
+    const opt = sel.options[sel.selectedIndex];
+    if (!opt || !opt.value) return;
+    if (name) name.value = opt.getAttribute('data-name') || '';
+    if (phone) phone.value = opt.getAttribute('data-phone') || '';
+    if (address) address.value = opt.getAttribute('data-address') || '';
+    if (notes) notes.value = opt.getAttribute('data-notes') || '';
+  }
+  sel.addEventListener('change', apply);
+})();
 </script>
 <%- include('partials/foot') %>

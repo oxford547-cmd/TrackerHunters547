@@ -11,6 +11,7 @@ const {
   buildOrderMessage,
   sendWhatsApp,
   notifyOrderStatus,
+  resolveFromNumber,
 } = require('../src/services/whatsapp');
 
 const origFetch = global.fetch;
@@ -118,6 +119,50 @@ test('mock fetch records Twilio call on status change', async () => {
   const decoded = decodeURIComponent(calls[0].opts.body.replace(/\+/g, ' '));
   assert.match(decoded, /H547-TEST01/);
   assert.match(decoded, /En camino/);
+});
+
+test('resolveFromNumber prefiere portals.whatsapp_number sobre TWILIO_WHATSAPP_FROM', () => {
+  process.env.TWILIO_WHATSAPP_FROM = 'whatsapp:+14155238886';
+  assert.equal(resolveFromNumber({ whatsapp_number: '5511112233' }), '+525511112233');
+  assert.equal(resolveFromNumber({ whatsapp_number: '' }), '+14155238886');
+  assert.equal(resolveFromNumber(null), '+14155238886');
+});
+
+test('buildOrderMessage usa la marca del portal cuando hay nombre', () => {
+  const body = buildOrderMessage(
+    { tracking_code: 'H547-TEST01', status: 'pedido_colocado', customer_name: 'García' },
+    { name: 'Logística Norte' }
+  );
+  assert.match(body, /Logística Norte/);
+  assert.match(body, /H547-TEST01/);
+  assert.doesNotMatch(body, /^Hunters 547:/);
+});
+
+test('notifyOrderStatus usa FROM del portal en el POST a Twilio', async () => {
+  process.env.TWILIO_ACCOUNT_SID = 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
+  process.env.TWILIO_AUTH_TOKEN = 'test-token';
+  process.env.TWILIO_WHATSAPP_FROM = 'whatsapp:+14155238886';
+
+  const calls = [];
+  global.fetch = async (url, opts) => {
+    calls.push({ url, opts });
+    return { ok: true, json: async () => ({ sid: 'SM-PORTAL' }) };
+  };
+
+  const result = await notifyOrderStatus({
+    tracking_code: 'H547-WA01',
+    status: 'confirmado',
+    phone: '5512345678',
+    customer_name: 'García',
+    portal: { name: 'Hunters 547 Demo', whatsapp_number: '5511112233' },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.sid, 'SM-PORTAL');
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].opts.body, /From=whatsapp%3A%2B525511112233/);
+  const decoded = decodeURIComponent(calls[0].opts.body.replace(/\+/g, ' '));
+  assert.match(decoded, /Hunters 547 Demo/);
 });
 
 test('sendWhatsApp usa el mock en create y entregado', async () => {
