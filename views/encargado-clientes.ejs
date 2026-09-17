@@ -53,8 +53,9 @@
       <label>Nombre
         <input type="text" name="name" required>
       </label>
-      <label>Teléfono
-        <input type="text" name="phone">
+      <label>Teléfono (WhatsApp)
+        <input type="tel" name="phone" placeholder="55… o +52…" autocomplete="tel">
+        <span class="muted small">Se normaliza a E.164 (+52…) para avisos del pedido.</span>
       </label>
       <label>Dirección
         <input type="text" name="address">

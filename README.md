@@ -21,6 +21,32 @@ Abre **http://localhost:3000/** (login en `/login`).
 | `PORT` | `3000` |
 | `SESSION_SECRET` | valor de desarrollo (cámbialo en producción) |
 | `DB_PATH` | `data/pedidos.sqlite` (no se versiona) |
+| `WHATSAPP_PROVIDER` | `twilio` (también `log` / `stub`; `meta` es un stub) |
+| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_WHATSAPP_FROM` | credenciales Twilio WhatsApp (`From` p. ej. `whatsapp:+14155238886`) |
+| `WHATSAPP_ENABLED` | `true` para exigir envío real (si faltan keys, se **registra el error** y no se tira el proceso) |
+| `PUBLIC_BASE_URL` | origen público para el enlace de rastreo en el mensaje |
+| `WHATSAPP_NOTIFY_CANCELADO` | `true` por defecto; `false` omite avisos de Cancelado |
+
+Copia la lista de `.env.example` e inyéctala en el proceso (export, systemd, panel del host). **No subas tokens.** `npm start` lee `process.env`; si existe un archivo `.env` en la raíz, se carga sin pisar variables ya definidas.
+
+## WhatsApp (ciclo de vida del pedido)
+
+Cada vez que un pedido se **crea** y en cada **cambio de estado** hasta **Entregado**, el sistema intenta un WhatsApp al **teléfono registrado del cliente** (campo `orders.phone`, con respaldo a `customers.phone` del **mismo** `portal_id`). Los números de México se normalizan a E.164 (`+52…`) cuando es posible.
+
+| Evento | Mensaje (es-MX) |
+|--------|------------------|
+| Alta (encargado) | Pedido **creado / registrado** + estado inicial + pista de rastreo |
+| Avance de estado (encargado) | Nuevo estado + número de pedido + marca del portal |
+| Entregado (chofer) | Aviso **final** de entrega |
+| Cancelado (encargado) | Aviso opcional (se puede desactivar con `WHATSAPP_NOTIFY_CANCELADO=false`) |
+
+Un enlace `wa.me` **no puede** empujar mensajes desde el servidor: hace falta **Twilio WhatsApp** (o más adelante Meta Cloud API / WhatsApp Business). Sin credenciales, el demo **solo escribe el mensaje en el log** y el pedido sigue igual.
+
+```bash
+npm test
+```
+
+Prueba de humo: un proveedor mock registra cada llamada al cambiar el estado (sin Twilio).
 
 Reiniciar datos demo:
 
@@ -136,10 +162,13 @@ Demo: inicia sesión como `encargado` — no aparece el pedido `H547-NTE01-…` 
 ├── src/
 │   ├── constants.js
 │   ├── db.js                  # schema + portal_id
+│   ├── phone.js               # E.164 MX para WhatsApp
 │   ├── portal.js              # slugs, logos, métricas
 │   ├── seed.js
 │   ├── middleware.js
+│   ├── services/whatsapp.js   # Twilio / log stub
 │   └── routes/                # auth, superadmin, encargado, chofer, cliente, rastreo, api
+├── test/                      # node:test (WhatsApp mock)
 ├── views/                     # EJS (incluye partials/sidebar.ejs)
 └── public/
     ├── assets/                # css, js, img (logo H547)
@@ -150,8 +179,8 @@ Demo: inicia sesión como `encargado` — no aparece el pedido `H547-NTE01-…` 
 
 - **portals** — tenants: `name`, `slug`, `logo_path`, contacto, `active`
 - **users** — `username`, `password_hash`, `role` (`superadmin|encargado|chofer|cliente`), `name`, `cliente_id`, `portal_id` (null en superadmin)
-- **customers** — `name`, `phone`, `address`, `portal_id`
-- **orders** — `tracking_code` (asignado por el encargado; único por `portal_id`), `customer_id`, entrega, `status`, `chofer_id`, `portal_id`
+- **customers** — `name`, `phone` (E.164 si se puede), `address`, `portal_id`
+- **orders** — `tracking_code` (asignado por el encargado; único por `portal_id`), `customer_id`, `phone` (avisos WhatsApp), entrega, `status`, `chofer_id`, `portal_id`
 - **location_updates** — GPS
 - **status_history** — historial de estados
 
