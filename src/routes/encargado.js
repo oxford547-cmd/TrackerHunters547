@@ -6,8 +6,7 @@ const { getDb, now, generateTrackingCode } = require('../db');
 const { requireAuth, requireRole, requirePortal, setFlash } = require('../middleware');
 const { ENCARGADO_FLOW, ORDER_STATUSES } = require('../constants');
 const { loadEncargadoMetrics } = require('../portal');
-const { persistPhone } = require('../phone');
-const { notifyOrderLater } = require('../services/whatsapp');
+const { notifyOrderStatusAsync } = require('../services/whatsapp');
 
 const router = express.Router();
 router.use(requireAuth, requireRole('encargado'), requirePortal);
@@ -105,7 +104,7 @@ router.post('/orders', (req, res) => {
   const pid = portalIdOf(req);
   const customerId = req.body.customer_id ? Number(req.body.customer_id) : null;
   let customer_name = String(req.body.customer_name || '').trim();
-  let phone = persistPhone(req.body.phone);
+  let phone = String(req.body.phone || '').trim();
   let address = String(req.body.address || '').trim();
   const notes = String(req.body.notes || '').trim();
   let chofer_id = req.body.chofer_id ? Number(req.body.chofer_id) : null;
@@ -134,7 +133,7 @@ router.post('/orders', (req, res) => {
     const c = d.prepare('SELECT * FROM customers WHERE id = ? AND portal_id = ?').get(customerId, pid);
     if (c) {
       customer_name = customer_name || c.name;
-      phone = phone || persistPhone(c.phone);
+      phone = phone || c.phone;
       address = address || c.address;
     } else {
       setFlash(req, 'danger', 'Cliente no pertenece a este portal.');
@@ -186,10 +185,11 @@ router.post('/orders', (req, res) => {
       'INSERT INTO status_history (order_id, status, changed_by, notes, created_at) VALUES (?,?,?,?,?)'
     ).run(info.lastInsertRowid, 'pedido_colocado', req.session.user.id, 'Creado por encargado', ts);
 
-    notifyOrderLater({
-      type: 'created',
-      orderId: Number(info.lastInsertRowid),
-      portalId: pid,
+    notifyOrderStatusAsync({
+      tracking_code: code,
+      status: 'pedido_colocado',
+      phone,
+      customer_name,
     });
 
     setFlash(req, 'ok', `Pedido creado: ${code}`);
@@ -266,7 +266,12 @@ router.post('/orders/:id/advance', (req, res) => {
   d.prepare(
     'INSERT INTO status_history (order_id, status, changed_by, notes, created_at) VALUES (?,?,?,?,?)'
   ).run(id, nxt, req.session.user.id, '', ts);
-  notifyOrderLater({ type: 'status', orderId: id, portalId: pid, status: nxt });
+  notifyOrderStatusAsync({
+    tracking_code: order.tracking_code,
+    status: nxt,
+    phone: order.phone,
+    customer_name: order.customer_name,
+  });
   setFlash(req, 'ok', `Estado: ${ORDER_STATUSES[nxt]}`);
   res.redirect('/encargado');
 });
@@ -290,7 +295,12 @@ router.post('/orders/:id/cancel', (req, res) => {
   d.prepare(
     'INSERT INTO status_history (order_id, status, changed_by, notes, created_at) VALUES (?,?,?,?,?)'
   ).run(id, 'cancelado', req.session.user.id, 'Cancelado', ts);
-  notifyOrderLater({ type: 'status', orderId: id, portalId: pid, status: 'cancelado' });
+  notifyOrderStatusAsync({
+    tracking_code: order.tracking_code,
+    status: 'cancelado',
+    phone: order.phone,
+    customer_name: order.customer_name,
+  });
   setFlash(req, 'ok', 'Pedido cancelado.');
   res.redirect('/encargado');
 });
@@ -350,7 +360,7 @@ router.post('/clientes', (req, res) => {
   const d = getDb();
   const pid = portalIdOf(req);
   const name = String(req.body.name || '').trim();
-  const phone = persistPhone(req.body.phone);
+  const phone = String(req.body.phone || '').trim();
   const address = String(req.body.address || '').trim();
   const username = String(req.body.username || '').trim();
   const password = String(req.body.password || '');

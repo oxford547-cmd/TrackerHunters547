@@ -1,38 +1,5 @@
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
-
-/** Optional local `.env` (does not override real process env). Never logs values. */
-function loadDotEnv() {
-  try {
-    const envPath = path.join(__dirname, '..', '.env');
-    if (!fs.existsSync(envPath)) return;
-    const text = fs.readFileSync(envPath, 'utf8');
-    for (const line of text.split(/\r?\n/)) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
-      const eq = trimmed.indexOf('=');
-      if (eq < 1) continue;
-      const key = trimmed.slice(0, eq).trim();
-      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) continue;
-      if (process.env[key] != null && process.env[key] !== '') continue;
-      let val = trimmed.slice(eq + 1).trim();
-      if (
-        (val.startsWith('"') && val.endsWith('"')) ||
-        (val.startsWith("'") && val.endsWith("'"))
-      ) {
-        val = val.slice(1, -1);
-      }
-      process.env[key] = val;
-    }
-  } catch (_) {
-    /* ignore malformed .env */
-  }
-}
-
-loadDotEnv();
-
 /** Status keys → Spanish labels (México) */
 const ORDER_STATUSES = {
   pedido_colocado: 'Pedido colocado',

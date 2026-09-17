@@ -5,7 +5,6 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 const { getDb, ensureSchema, now, DB_PATH } = require('./db');
 const { daysAgoTs } = require('./portal');
-const { persistPhone } = require('./phone');
 
 function wipePortalUploads() {
   const root = path.join(__dirname, '..', 'public', 'uploads', 'portals');
@@ -56,7 +55,7 @@ function seed(force = false) {
       'hunters-demo',
       null,
       'Ana Encargada',
-      persistPhone('5511112233'),
+      '5511112233',
       'demo@hunters547.com',
       'Portal demo por defecto. Conserva los usuarios históricos.',
       1,
@@ -67,7 +66,7 @@ function seed(force = false) {
       'logistica-norte',
       null,
       'Roberto Sánchez',
-      persistPhone('8180001111'),
+      '8180001111',
       'norte@example.com',
       'Segundo portal para demostrar aislamiento multi-tenant.',
       1,
@@ -79,21 +78,21 @@ function seed(force = false) {
     );
     const cust1 = insCust.run(
       'Cliente Demo García',
-      persistPhone('5512345678'),
+      '5512345678',
       'Av. Reforma 100, Col. Centro, CDMX',
       ts,
       portal1
     ).lastInsertRowid;
     const cust2 = insCust.run(
       'Otro Cliente Pérez',
-      persistPhone('5587654321'),
+      '5587654321',
       'Insurgentes Sur 200, CDMX',
       ts,
       portal1
     ).lastInsertRowid;
     const custN = insCust.run(
       'Cliente Norte López',
-      persistPhone('8185550101'),
+      '8185550101',
       'Av. Constitución 50, Monterrey, NL',
       ts,
       portal2
@@ -172,7 +171,7 @@ function seed(force = false) {
       code1,
       cust1,
       'Cliente Demo García',
-      persistPhone('5512345678'),
+      '5512345678',
       'Av. Reforma 100, Col. Centro, CDMX',
       'Pedido demo 1 — avanzar a En camino y probar GPS',
       'pedido_colocado',
@@ -188,7 +187,7 @@ function seed(force = false) {
       code2,
       cust1,
       'Cliente Demo García',
-      persistPhone('5512345678'),
+      '5512345678',
       'Av. Reforma 100, Col. Centro, CDMX',
       'Pedido demo 2 del mismo cliente',
       'confirmado',
@@ -204,7 +203,7 @@ function seed(force = false) {
       codeOther,
       cust2,
       'Otro Cliente Pérez',
-      persistPhone('5587654321'),
+      '5587654321',
       'Insurgentes Sur 200, CDMX',
       'Pedido de OTRO cliente — el portal cliente NO debe verlo',
       'en_preparacion',
@@ -221,7 +220,7 @@ function seed(force = false) {
       codeLive,
       cust1,
       'Cliente Demo García',
-      persistPhone('5512345678'),
+      '5512345678',
       'Av. Reforma 100, Col. Centro, CDMX',
       'Pedido en camino (seed) para mapa / GPS',
       'en_camino',
@@ -238,7 +237,7 @@ function seed(force = false) {
       codeDone,
       cust2,
       'Otro Cliente Pérez',
-      persistPhone('5587654321'),
+      '5587654321',
       'Insurgentes Sur 200, CDMX',
       'Pedido entregado de demostración',
       'entregado',
@@ -254,7 +253,7 @@ function seed(force = false) {
       codeN1,
       custN,
       'Cliente Norte López',
-      persistPhone('8185550101'),
+      '8185550101',
       'Av. Constitución 50, Monterrey, NL',
       'Pedido Norte — no visible en portal demo',
       'pedido_colocado',
@@ -271,7 +270,7 @@ function seed(force = false) {
       codeN2,
       custN,
       'Cliente Norte López',
-      persistPhone('8185550101'),
+      '8185550101',
       'Av. Constitución 50, Monterrey, NL',
       'En camino Norte',
       'en_camino',
@@ -288,7 +287,7 @@ function seed(force = false) {
       codeN3,
       custN,
       'Cliente Norte López',
-      persistPhone('8185550101'),
+      '8185550101',
       'Av. Constitución 50, Monterrey, NL',
       'Entregado Norte',
       'entregado',
@@ -305,7 +304,7 @@ function seed(force = false) {
       codeN4,
       custN,
       'Cliente Norte López',
-      persistPhone('8185550101'),
+      '8185550101',
       'Av. Constitución 50, Monterrey, NL',
       'Cancelado Norte',
       'cancelado',

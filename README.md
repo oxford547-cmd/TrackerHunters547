@@ -21,32 +21,26 @@ Abre **http://localhost:3000/** (login en `/login`).
 | `PORT` | `3000` |
 | `SESSION_SECRET` | valor de desarrollo (cámbialo en producción) |
 | `DB_PATH` | `data/pedidos.sqlite` (no se versiona) |
-| `WHATSAPP_PROVIDER` | `twilio` (también `log` / `stub`; `meta` es un stub) |
-| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_WHATSAPP_FROM` | credenciales Twilio WhatsApp (`From` p. ej. `whatsapp:+14155238886`) |
-| `WHATSAPP_ENABLED` | `true` para exigir envío real (si faltan keys, se **registra el error** y no se tira el proceso) |
-| `PUBLIC_BASE_URL` | origen público para el enlace de rastreo en el mensaje |
-| `WHATSAPP_NOTIFY_CANCELADO` | `true` por defecto; `false` omite avisos de Cancelado |
+| `TWILIO_ACCOUNT_SID` | Account SID de Twilio (WhatsApp) |
+| `TWILIO_AUTH_TOKEN` | Auth Token de Twilio |
+| `TWILIO_WHATSAPP_FROM` | Remitente, p. ej. `whatsapp:+14155238886` (Sandbox o sender aprobado) |
 
-Copia la lista de `.env.example` e inyéctala en el proceso (export, systemd, panel del host). **No subas tokens.** `npm start` lee `process.env`; si existe un archivo `.env` en la raíz, se carga sin pisar variables ya definidas.
+Si falta **alguna** de las tres `TWILIO_*`, **no se envía** nada: solo se escribe en consola (`[whatsapp] (log only — falta TWILIO_*)`). El demo local corre sin cuenta Twilio. Un enlace `wa.me` no puede empujar mensajes desde el servidor.
 
-## WhatsApp (ciclo de vida del pedido)
+```bash
+export TWILIO_ACCOUNT_SID=ACxxxxxxxx
+export TWILIO_AUTH_TOKEN=xxxxxxxx
+export TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
+npm start
+```
 
-Cada vez que un pedido se **crea** y en cada **cambio de estado** hasta **Entregado**, el sistema intenta un WhatsApp al **teléfono registrado del cliente** (campo `orders.phone`, con respaldo a `customers.phone` del **mismo** `portal_id`). Los números de México se normalizan a E.164 (`+52…`) cuando es posible.
-
-| Evento | Mensaje (es-MX) |
-|--------|------------------|
-| Alta (encargado) | Pedido **creado / registrado** + estado inicial + pista de rastreo |
-| Avance de estado (encargado) | Nuevo estado + número de pedido + marca del portal |
-| Entregado (chofer) | Aviso **final** de entrega |
-| Cancelado (encargado) | Aviso opcional (se puede desactivar con `WHATSAPP_NOTIFY_CANCELADO=false`) |
-
-Un enlace `wa.me` **no puede** empujar mensajes desde el servidor: hace falta **Twilio WhatsApp** (o más adelante Meta Cloud API / WhatsApp Business). Sin credenciales, el demo **solo escribe el mensaje en el log** y el pedido sigue igual.
+**No subas tokens.** Implementación: `src/services/whatsapp.js` (REST Twilio, sin SDK). Hooks: `POST /encargado/orders`, avance/cancelación del encargado, `POST /api/status` (Entregado por chofer). Mensajes en español con número de pedido y estado.
 
 ```bash
 npm test
 ```
 
-Prueba de humo: un proveedor mock registra cada llamada al cambiar el estado (sin Twilio).
+Prueba de humo: un `fetch` mock registra el POST a Twilio al cambiar el estado.
 
 Reiniciar datos demo:
 
@@ -162,13 +156,13 @@ Demo: inicia sesión como `encargado` — no aparece el pedido `H547-NTE01-…` 
 ├── src/
 │   ├── constants.js
 │   ├── db.js                  # schema + portal_id
-│   ├── phone.js               # E.164 MX para WhatsApp
 │   ├── portal.js              # slugs, logos, métricas
 │   ├── seed.js
 │   ├── middleware.js
-│   ├── services/whatsapp.js   # Twilio / log stub
+│   ├── services/
+│   │   └── whatsapp.js        # Twilio WhatsApp (o log-only sin creds)
 │   └── routes/                # auth, superadmin, encargado, chofer, cliente, rastreo, api
-├── test/                      # node:test (WhatsApp mock)
+├── test/                      # node:test (WhatsApp + fetch mock)
 ├── views/                     # EJS (incluye partials/sidebar.ejs)
 └── public/
     ├── assets/                # css, js, img (logo H547)
@@ -179,7 +173,7 @@ Demo: inicia sesión como `encargado` — no aparece el pedido `H547-NTE01-…` 
 
 - **portals** — tenants: `name`, `slug`, `logo_path`, contacto, `active`
 - **users** — `username`, `password_hash`, `role` (`superadmin|encargado|chofer|cliente`), `name`, `cliente_id`, `portal_id` (null en superadmin)
-- **customers** — `name`, `phone` (E.164 si se puede), `address`, `portal_id`
+- **customers** — `name`, `phone`, `address`, `portal_id`
 - **orders** — `tracking_code` (asignado por el encargado; único por `portal_id`), `customer_id`, `phone` (avisos WhatsApp), entrega, `status`, `chofer_id`, `portal_id`
 - **location_updates** — GPS
 - **status_history** — historial de estados
@@ -189,6 +183,12 @@ Demo: inicia sesión como `encargado` — no aparece el pedido `H547-NTE01-…` 
 - `POST /api/location`: solo **chofer**; pedido **asignado a él**, mismo `portal_id` y status **`en_camino`**; si no → 403.
 - `POST /api/status` (entregado): mismo criterio.
 - `GET /api/cliente/*`: `customer_id` + `portal_id` de sesión.
+
+## WhatsApp (notificaciones de pedido)
+
+Al **crear** un pedido y en **cada cambio de estado** hasta **Entregado** (incluido), la app notifica al teléfono registrado del cliente (`orders.phone`) vía Twilio WhatsApp. Mensajes en **español**, con número de pedido (`tracking_code`) y estado legible. Cancelado también avisa (el encargado puede cancelar).
+
+Si falta alguna de `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_WHATSAPP_FROM`, **no se envía** nada: solo se escribe en consola. Implementación: `src/services/whatsapp.js` (REST Twilio, sin SDK). Hooks: `POST /encargado/orders`, avance/cancelación del encargado, `POST /api/status` (Entregado por chofer).
 
 ## SQLite (demo) → Supabase (producción)
 
