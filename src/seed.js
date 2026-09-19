@@ -6,13 +6,17 @@ const bcrypt = require('bcryptjs');
 const { getDb, ensureSchema, now, DB_PATH } = require('./db');
 const { daysAgoTs } = require('./portal');
 
-function wipePortalUploads() {
-  const root = path.join(__dirname, '..', 'public', 'uploads', 'portals');
+function wipeUploadDir(rel) {
+  const root = path.join(__dirname, '..', 'public', 'uploads', rel);
   fs.mkdirSync(root, { recursive: true });
   for (const name of fs.readdirSync(root)) {
     if (name === '.gitkeep') continue;
     fs.rmSync(path.join(root, name), { recursive: true, force: true });
   }
+}
+
+function wipePortalUploads() {
+  wipeUploadDir('portals');
 }
 
 function seed(force = false) {
@@ -31,12 +35,14 @@ function seed(force = false) {
       d.exec(`
         DELETE FROM location_updates;
         DELETE FROM status_history;
+        DELETE FROM order_items;
         DELETE FROM orders;
         DELETE FROM users;
         DELETE FROM customers;
         DELETE FROM portals;
       `);
       wipePortalUploads();
+      wipeUploadDir('deliveries');
     }
 
     const ts = now();
@@ -76,11 +82,12 @@ function seed(force = false) {
     ).lastInsertRowid;
 
     const insCust = d.prepare(
-      'INSERT INTO customers (name, phone, address, notes, active, created_at, portal_id) VALUES (?,?,?,?,?,?,?)'
+      'INSERT INTO customers (name, phone, email, address, notes, active, created_at, portal_id) VALUES (?,?,?,?,?,?,?,?)'
     );
     const cust1 = insCust.run(
       'Cliente Demo García',
       '5512345678',
+      'demo.garcia@example.com',
       'Av. Reforma 100, Col. Centro, CDMX',
       'Entregar en recepción',
       1,
@@ -90,6 +97,7 @@ function seed(force = false) {
     const cust2 = insCust.run(
       'Otro Cliente Pérez',
       '5587654321',
+      'otro.perez@example.com',
       'Insurgentes Sur 200, CDMX',
       '',
       1,
@@ -99,6 +107,7 @@ function seed(force = false) {
     const custN = insCust.run(
       'Cliente Norte López',
       '8185550101',
+      'norte.lopez@example.com',
       'Av. Constitución 50, Monterrey, NL',
       'Horario 9–18 h',
       1,

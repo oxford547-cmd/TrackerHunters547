@@ -128,10 +128,6 @@ router.post('/portals', withUpload, (req, res) => {
     setFlash(req, 'danger', 'El nombre de la empresa es requerido.');
     return res.redirect('/superadmin/portals/new');
   }
-  if (!whatsapp_number) {
-    setFlash(req, 'danger', 'El número de WhatsApp para actualizaciones es requerido.');
-    return res.redirect('/superadmin/portals/new');
-  }
   if (!encUser || !encPass) {
     setFlash(req, 'danger', 'Usuario y contraseña del encargado son requeridos.');
     return res.redirect('/superadmin/portals/new');
@@ -219,10 +215,6 @@ router.post('/portals/:id', withUpload, (req, res) => {
 
   if (!name) {
     setFlash(req, 'danger', 'El nombre de la empresa es requerido.');
-    return res.redirect(`/superadmin/portals/${id}/edit`);
-  }
-  if (!whatsapp_number) {
-    setFlash(req, 'danger', 'El número de WhatsApp para actualizaciones es requerido.');
     return res.redirect(`/superadmin/portals/${id}/edit`);
   }
 

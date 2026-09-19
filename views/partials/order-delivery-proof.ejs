@@ -1,0 +1,26 @@
+<% if (order && order.status === 'entregado' && (order.delivery_photo_path || order.delivery_signature_path)) { %>
+<div class="delivery-proof card-inner">
+  <h3 class="materials-title">Evidencia de entrega</h3>
+  <div class="delivery-proof-grid">
+    <% if (order.delivery_photo_path) { %>
+    <figure class="proof-fig">
+      <figcaption class="muted small">Foto de entrega</figcaption>
+      <a href="<%= order.delivery_photo_path %>" target="_blank" rel="noopener">
+        <img src="<%= order.delivery_photo_path %>" alt="Foto de entrega" class="proof-img">
+      </a>
+    </figure>
+    <% } %>
+    <% if (order.delivery_signature_path) { %>
+    <figure class="proof-fig">
+      <figcaption class="muted small">Firma del receptor</figcaption>
+      <a href="<%= order.delivery_signature_path %>" target="_blank" rel="noopener">
+        <img src="<%= order.delivery_signature_path %>" alt="Firma" class="proof-img proof-sig">
+      </a>
+    </figure>
+    <% } %>
+  </div>
+  <% if (order.delivered_at) { %>
+    <p class="muted small">Entregado: <%= order.delivered_at %></p>
+  <% } %>
+</div>
+<% } %>

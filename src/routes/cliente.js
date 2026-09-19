@@ -1,7 +1,7 @@
 'use strict';
 
 const express = require('express');
-const { getDb } = require('../db');
+const { getDb, loadOrderItems } = require('../db');
 const { requireAuth, requireRole, requirePortal } = require('../middleware');
 
 const router = express.Router();
@@ -70,9 +70,12 @@ router.get('/pedido/:id', (req, res) => {
     )
     .get(order.id);
 
+  const items = loadOrderItems(order.id);
+
   res.render('cliente-detalle', {
     title: `Pedido ${order.tracking_code}`,
     order,
+    items,
     history,
     lastLoc,
   });
