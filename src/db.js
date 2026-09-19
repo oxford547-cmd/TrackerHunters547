@@ -3,6 +3,17 @@
 const fs = require('fs');
 const path = require('path');
 const { getSupabase, throwIfError } = require('./supabase');
+const {
+  parseOrderItemsFromBody,
+  parseRemisionItemsFromBody,
+  formatFolio,
+  companyAddressOf,
+  todayLocalDate,
+  previewNextFolio,
+  decorateRemision,
+  sumCantidad,
+  sumImporte,
+} = require('./parsers');
 
 function now() {
   return new Date().toISOString();
@@ -466,6 +477,26 @@ async function listOrderItems(orderId) {
   return res.data || [];
 }
 
+async function attachOrderItems(orders) {
+  const list = orders || [];
+  if (!list.length) return list;
+  const sb = getSupabase();
+  const ids = list.map((o) => o.id);
+  const res = await sb
+    .from('order_items')
+    .select('*')
+    .in('order_id', ids)
+    .order('sort_order', { ascending: true });
+  throwIfError(res, 'attachOrderItems');
+  const by = new Map();
+  for (const it of res.data || []) {
+    const k = Number(it.order_id);
+    if (!by.has(k)) by.set(k, []);
+    by.get(k).push(it);
+  }
+  return list.map((o) => ({ ...o, items: by.get(Number(o.id)) || [] }));
+}
+
 async function insertStatusHistory(fields) {
   const sb = getSupabase();
   const payload = {
@@ -615,15 +646,48 @@ async function claimRemisionFolio(portalId) {
   throw err;
 }
 
+async function maxRemisionFolio(portalId) {
+  const sb = getSupabase();
+  const res = await sb
+    .from('remisiones')
+    .select('folio')
+    .eq('portal_id', portalId)
+    .order('folio', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  throwIfError(res, 'maxRemisionFolio');
+  return res.data ? Number(res.data.folio) : 0;
+}
+
+async function nextFolioPreview(portalId) {
+  const [portal, maxFolio] = await Promise.all([findPortalById(portalId), maxRemisionFolio(portalId)]);
+  return previewNextFolio(portal && portal.remision_next, maxFolio);
+}
+
 async function listRemisiones(portalId) {
   const sb = getSupabase();
   const res = await sb
     .from('remisiones')
-    .select('*')
+    .select('*, creator:users!remisiones_created_by_fkey(name)')
     .eq('portal_id', portalId)
     .order('folio', { ascending: false });
   throwIfError(res, 'listRemisiones');
-  return res.data || [];
+  const rows = res.data || [];
+  const ids = rows.map((r) => r.id);
+  let itemsBy = new Map();
+  if (ids.length) {
+    const itemsRes = await sb
+      .from('remision_items')
+      .select('remision_id, cantidad, importe')
+      .in('remision_id', ids);
+    throwIfError(itemsRes, 'listRemisiones.items');
+    for (const it of itemsRes.data || []) {
+      const k = Number(it.remision_id);
+      if (!itemsBy.has(k)) itemsBy.set(k, []);
+      itemsBy.get(k).push(it);
+    }
+  }
+  return rows.map((r) => decorateRemision(r, itemsBy.get(Number(r.id)) || []));
 }
 
 async function findRemision(id, portalId) {
@@ -848,6 +912,7 @@ module.exports = {
   updateOrder,
   insertOrderItems,
   listOrderItems,
+  attachOrderItems,
   insertStatusHistory,
   listStatusHistory,
   listStatusHistoryPublic,
@@ -857,7 +922,18 @@ module.exports = {
   listChoferRecentDelivered,
   listCustomerOrders,
   findCustomerOrder,
+  parseOrderItemsFromBody,
+  parseRemisionItemsFromBody,
+  formatFolio,
+  companyAddressOf,
+  todayLocalDate,
+  previewNextFolio,
+  decorateRemision,
+  sumCantidad,
+  sumImporte,
   claimRemisionFolio,
+  maxRemisionFolio,
+  nextFolioPreview,
   listRemisiones,
   findRemision,
   insertRemision,

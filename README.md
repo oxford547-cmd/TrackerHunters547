@@ -1,8 +1,8 @@
 # TrackerHunters547 — rastreo de pedidos (Node + Supabase)
 
-Aplicación **Node.js + Express** para la agencia **Hunters 547**: portales de clientes, dashboard de encargado, choferes con GPS, remisiones provisionales y rastreo público. Versión **1.4.0**.
+Aplicación **Node.js + Express** para la agencia **Hunters 547**: portales de clientes, dashboard de encargado, choferes con GPS, remisiones provisionales y rastreo público. Versión **1.6.0**.
 
-Persistencia en **Supabase Postgres** (esquema ya creado). Auth propia: **express-session + bcryptjs** contra `users.password_hash` — **no** se usa Supabase Auth. El servidor habla con PostgREST usando **service_role** (RLS activo, sin políticas anon).
+Persistencia **solo** en **Supabase Postgres** (esquema ya creado; no hay SQLite). Auth propia: **express-session + bcryptjs** contra `users.password_hash` — **no** se usa Supabase Auth. El servidor habla con PostgREST usando **service_role** (RLS activo, sin políticas anon).
 
 ## Cómo correr
 
@@ -67,7 +67,21 @@ Columnas de portal: `name`, `slug`, `logo_path`, `contact_name`, `phone`, `email
 - **OC** (`purchase_order`) y **partidas** (`order_items`: description, uom, quantity).
 - Autofill al elegir un cliente de alta (nombre, teléfono, email, dirección, notas).
 - Dashboard filtrable por día / semana / mes / año o rango manual.
-- **Remisiones provisionales:** folio consecutivo atómico vía `portals.remision_next` (compare-and-swap; unique `(portal_id, folio)`).
+- **Remisiones provisionales:** sidebar → listado → alta → consulta/impresión. Folio consecutivo atómico vía `portals.remision_next` (compare-and-swap; unique `(portal_id, folio)`). Logo, razón social y dirección salen del portal.
+
+### Mapeo remisión (PR #7 SQLite → columnas live)
+
+| UI / PR #7 | Columna live |
+|------------|----------------|
+| folio consecutivo por portal | `portals.remision_next` + `remisiones.folio` + `UNIQUE(portal_id, folio)` |
+| fecha | `remisiones.fecha` |
+| nombre de cliente | `remisiones.customer_name` (no existe `cliente_id` en remisiones) |
+| empresa / dirección | `remisiones.company_name`, `remisiones.company_address` (desde `portals.name` + `portals.address` / `notes`) |
+| `company_logo_path` | `remisiones.logo_path` (copia de `portals.logo_path`) |
+| `total_importe` | `remisiones.total` (numeric NOT NULL default 0) |
+| `total_cantidad` | **no hay columna**; se suma `remision_items.cantidad` en el servidor |
+| líneas qty / UOM / desc / lote / importe | `remision_items.cantidad`, `unidad`, `descripcion`, `lote`, `importe` (importe opcional en UI; se guarda 0 si vacío) |
+| `users.cliente_id` (sesión) | `users.customer_id` (el alias `cliente_id` solo vive en memoria) |
 
 ## Stack
 
@@ -87,8 +101,11 @@ Columnas de portal: `name`, `slug`, `logo_path`, `contact_name`, `phone`, `email
 | `/encargado/nuevo` | Alta de pedido (OC + partidas + autofill) |
 | `/encargado/clientes` | Altas de clientes |
 | `/encargado/choferes` | Altas de choferes |
-| `/encargado/remisiones` | Remisiones provisionales |
-| `/chofer` | Entregas + GPS + foto/firma |
+| `/encargado/remisiones` | Listado de remisiones provisionales |
+| `/encargado/remisiones/nueva` | Alta (líneas + folio preview) |
+| `/encargado/remisiones/:id` | Consulta / impresión |
+| `/encargado/pedido/:id` | Detalle de pedido (OC, partidas, evidencia) |
+| `/chofer` | Entregas + GPS + foto/firma **obligatorias** |
 | `/cliente` | Mis pedidos |
 | `/rastreo?codigo=…` | Rastreo público + mapa |
 
@@ -99,7 +116,7 @@ Al crear un pedido y en cada cambio de estado (incluido Entregado / Cancelado) s
 ## GPS / estado
 
 - `POST /api/location`: solo **chofer**; pedido asignado, mismo `portal_id`, status **`en_camino`**.
-- `POST /api/status` (o `/api/deliver`): Entregado + foto/firma opcionales; mismo criterio.
+- `POST /api/status` (o `/api/deliver`): Entregado + **foto y firma requeridas**; mismo criterio.
 - `GET /api/cliente/*`: `customer_id` + `portal_id` de sesión.
 
 Geolocation del navegador exige HTTPS fuera de localhost.
@@ -109,6 +126,15 @@ Geolocation del navegador exige HTTPS fuera de localhost.
 ```bash
 npm test
 ```
+
+Los unit tests no necesitan credenciales. El smoke **sí** habla con el proyecto live:
+
+```bash
+# Requiere SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (o SUPABASE_API_KEY) en .env
+npm run smoke
+```
+
+Comprueba env + fila `users.username=superadmin` (no toca el password). Luego `npm start` y `/login`.
 
 ## Licencia
 

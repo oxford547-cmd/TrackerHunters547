@@ -27,6 +27,17 @@ const {
   findRemision,
   listRemisionItems,
   createRemisionWithFolio,
+  parseOrderItemsFromBody,
+  parseRemisionItemsFromBody,
+  companyAddressOf,
+  todayLocalDate,
+  formatFolio,
+  nextFolioPreview,
+  decorateRemision,
+  sumImporte,
+  listOrderItems,
+  listStatusHistory,
+  findUserById,
 } = require('../db');
 const { requireAuth, requireRole, requirePortal, setFlash, wrap } = require('../middleware');
 const { ENCARGADO_FLOW, ORDER_STATUSES } = require('../constants');
@@ -58,47 +69,12 @@ function parseRangeFromQuery(query) {
   return resolveDateRange(preset, query.from, query.to);
 }
 
-function parseLines(body, keys) {
-  const cols = keys.map((k) => [].concat(body[k] || []));
-  const n = Math.max(0, ...cols.map((c) => c.length));
-  const rows = [];
-  for (let i = 0; i < n; i++) {
-    const row = {};
-    keys.forEach((k, idx) => {
-      row[k] = String(cols[idx][i] != null ? cols[idx][i] : '').trim();
-    });
-    rows.push(row);
-  }
-  return rows;
-}
-
 function parseOrderItems(body) {
-  return parseLines(body, ['item_description', 'item_uom', 'item_qty'])
-    .filter((r) => r.item_description)
-    .map((r, i) => ({
-      description: r.item_description,
-      uom: r.item_uom,
-      quantity: r.item_qty === '' ? 0 : Number(r.item_qty),
-      sort_order: i,
-    }));
+  return parseOrderItemsFromBody(body);
 }
 
 function parseRemisionItems(body) {
-  return parseLines(body, [
-    'item_cantidad',
-    'item_unidad',
-    'item_descripcion',
-    'item_lote',
-    'item_importe',
-  ])
-    .filter((r) => r.item_descripcion)
-    .map((r) => ({
-      cantidad: r.item_cantidad === '' ? 0 : Number(r.item_cantidad),
-      unidad: r.item_unidad,
-      descripcion: r.item_descripcion,
-      lote: r.item_lote,
-      importe: r.item_importe === '' ? 0 : Number(r.item_importe),
-    }));
+  return parseRemisionItemsFromBody(body);
 }
 
 router.get(
@@ -613,6 +589,33 @@ router.post(
 );
 
 router.get(
+  '/pedido/:id',
+  wrap(async (req, res) => {
+    const pid = portalIdOf(req);
+    const id = Number(req.params.id);
+    const order = await findPortalOrder(id, pid);
+    if (!order) {
+      setFlash(req, 'danger', 'Pedido no encontrado.');
+      return res.redirect('/encargado');
+    }
+    const [items, history, chofer] = await Promise.all([
+      listOrderItems(order.id),
+      listStatusHistory(order.id),
+      order.chofer_id ? findUserById(order.chofer_id) : null,
+    ]);
+    res.render('encargado-detalle', {
+      title: `Pedido ${order.tracking_code}`,
+      order,
+      items,
+      history,
+      chofer,
+      withSidebar: true,
+      activeNav: 'dashboard',
+    });
+  })
+);
+
+router.get(
   '/remisiones',
   wrap(async (req, res) => {
     const pid = portalIdOf(req);
@@ -620,6 +623,7 @@ router.get(
     res.render('encargado-remisiones', {
       title: 'Remisiones provisionales',
       remisiones,
+      formatFolio,
       withSidebar: true,
       activeNav: 'remisiones',
     });
@@ -631,11 +635,19 @@ router.get(
   wrap(async (req, res) => {
     const pid = portalIdOf(req);
     const portal = await getPortal(pid);
-    const customers = (await listCustomers(pid)).filter((c) => c.active !== 0);
-    res.render('encargado-remision-form', {
-      title: 'Nueva remisión',
+    const [customers, previewFolio] = await Promise.all([
+      listCustomers(pid).then((rows) => rows.filter((c) => c.active !== 0)),
+      nextFolioPreview(pid),
+    ]);
+    res.render('encargado-remision-nueva', {
+      title: 'Nueva remisión provisional',
       customers,
-      portal,
+      previewFolio,
+      today: todayLocalDate(),
+      companyName: portal ? portal.name : '',
+      companyAddress: companyAddressOf(portal),
+      companyLogo: logoUrl(portal),
+      formatFolio,
       withSidebar: true,
       activeNav: 'remisiones',
     });
@@ -647,36 +659,53 @@ router.post(
   wrap(async (req, res) => {
     const pid = portalIdOf(req);
     const portal = await getPortal(pid);
+    if (!portal) {
+      setFlash(req, 'danger', 'Portal no encontrado.');
+      return res.redirect('/encargado/remisiones');
+    }
     const customer_name = String(req.body.customer_name || '').trim();
-    const company_name = String(req.body.company_name || '').trim() || (portal && portal.name) || '';
-    const company_address =
-      String(req.body.company_address || '').trim() || (portal && portal.address) || '';
-    const fecha = String(req.body.fecha || '').trim() || new Date().toISOString().slice(0, 10);
+    let fecha = String(req.body.fecha || '').trim() || todayLocalDate();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) fecha = todayLocalDate();
     const items = parseRemisionItems(req.body);
     if (!customer_name) {
-      setFlash(req, 'danger', 'El nombre del cliente es requerido.');
+      setFlash(req, 'danger', 'Nombre de cliente requerido.');
       return res.redirect('/encargado/remisiones/nueva');
     }
     if (!items.length) {
-      setFlash(req, 'danger', 'Agrega al menos una partida.');
+      setFlash(req, 'danger', 'Agrega al menos una línea con descripción.');
       return res.redirect('/encargado/remisiones/nueva');
     }
-    const total = items.reduce((s, it) => s + (Number(it.importe) || 0), 0);
-    const { remision } = await createRemisionWithFolio(
-      {
-        portal_id: pid,
-        fecha,
-        customer_name,
-        company_name,
-        company_address,
-        logo_path: portal && portal.logo_path,
-        total,
-        created_by: req.session.user.id,
-      },
-      items
-    );
-    setFlash(req, 'ok', `Remisión folio ${remision.folio} creada.`);
-    res.redirect(`/encargado/remisiones/${remision.id}`);
+
+    let total = sumImporte(items);
+    const totalField = String(req.body.total_importe || '').trim();
+    if (totalField !== '') {
+      const n = Number(totalField);
+      if (Number.isFinite(n)) total = n;
+    }
+
+    try {
+      const { remision } = await createRemisionWithFolio(
+        {
+          portal_id: pid,
+          fecha,
+          customer_name,
+          company_name: portal.name,
+          company_address: companyAddressOf(portal),
+          logo_path: portal.logo_path || null,
+          total: total == null ? 0 : total,
+          created_by: req.session.user.id,
+        },
+        items
+      );
+      setFlash(req, 'ok', `Remisión folio ${formatFolio(remision.folio)} creada.`);
+      return res.redirect(`/encargado/remisiones/${remision.id}`);
+    } catch (err) {
+      if (String(err.message || '').includes('UNIQUE') || err.code === '23505') {
+        setFlash(req, 'danger', 'Conflicto de folio. Intenta de nuevo.');
+        return res.redirect('/encargado/remisiones/nueva');
+      }
+      throw err;
+    }
   })
 );
 
@@ -684,19 +713,23 @@ router.get(
   '/remisiones/:id',
   wrap(async (req, res) => {
     const pid = portalIdOf(req);
-    const remision = await findRemision(Number(req.params.id), pid);
-    if (!remision) {
+    const remisionRow = await findRemision(Number(req.params.id), pid);
+    if (!remisionRow) {
       setFlash(req, 'danger', 'Remisión no encontrada.');
       return res.redirect('/encargado/remisiones');
     }
-    const items = await listRemisionItems(remision.id);
+    const items = await listRemisionItems(remisionRow.id);
+    const remision = decorateRemision(remisionRow, items);
     const portal = await getPortal(pid);
-    res.render('encargado-remision', {
-      title: `Remisión ${remision.folio}`,
+    const creator = remision.created_by ? await findUserById(remision.created_by) : null;
+    const printLogo = logoUrl({ logo_path: remision.logo_path || (portal && portal.logo_path) });
+    res.render('encargado-remision-detalle', {
+      title: `Remisión ${formatFolio(remision.folio)}`,
       remision,
       items,
-      portal,
-      logo: logoUrl(portal),
+      creator,
+      printLogo,
+      formatFolio,
       withSidebar: true,
       activeNav: 'remisiones',
     });

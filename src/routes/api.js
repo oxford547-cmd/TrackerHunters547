@@ -107,17 +107,26 @@ async function markDelivered(req, res) {
   }
 
   const ts = now();
-  const patch = { status: 'entregado', updated_at: ts, delivered_at: ts };
   const photo = req.file || (req.files && req.files.photo && req.files.photo[0]);
-  if (photo) {
-    const saved = saveDeliveryAsset(orderId, photo, 'photo');
-    if (saved) patch.delivery_photo_path = saved;
-  }
   const sigRaw = req.body.signature || req.body.delivery_signature;
-  if (sigRaw) {
-    const saved = saveSignatureDataUrl(orderId, String(sigRaw));
-    if (saved) patch.delivery_signature_path = saved;
+  if (!photo) {
+    return res.status(400).json({ ok: false, error: 'Foto de entrega requerida' });
   }
+  if (!sigRaw) {
+    return res.status(400).json({ ok: false, error: 'Firma de entrega requerida' });
+  }
+  const photoPath = saveDeliveryAsset(orderId, photo, 'photo');
+  const signaturePath = saveSignatureDataUrl(orderId, String(sigRaw));
+  if (!photoPath || !signaturePath) {
+    return res.status(400).json({ ok: false, error: 'No se pudo guardar la evidencia de entrega' });
+  }
+  const patch = {
+    status: 'entregado',
+    updated_at: ts,
+    delivered_at: ts,
+    delivery_photo_path: photoPath,
+    delivery_signature_path: signaturePath,
+  };
 
   await updateOrder(orderId, patch);
   await insertStatusHistory({

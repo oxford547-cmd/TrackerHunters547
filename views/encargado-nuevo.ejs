@@ -21,8 +21,8 @@
         <button type="button" class="btn btn-sm btn-glass js-use-suggest" style="margin-left:.35rem">Usar sugerencia</button>
       </span>
     </label>
-    <label>Orden de compra (OC)
-      <input type="text" name="purchase_order" maxlength="80" placeholder="OC / referencia del cliente">
+    <label class="span-2">Número de Orden de Compra
+      <input type="text" name="purchase_order" maxlength="120" placeholder="OC / PO del cliente (opcional)" autocomplete="off">
     </label>
     <label>Cliente existente (alta)
       <select name="customer_id" id="customer-select">
@@ -34,20 +34,20 @@
                   data-email="<%= c.email || '' %>"
                   data-address="<%= c.address || '' %>"
                   data-notes="<%= c.notes || '' %>">
-            <%= c.name %> (<%= c.phone || 'sin tel' %>)
+            <%= c.name %> (<%= c.email || c.phone || 'sin contacto' %>)
           </option>
         <% }) %>
       </select>
-      <span class="muted small">Al elegir un cliente se rellenan contacto, teléfono, email, dirección y notas.</span>
+      <span class="muted small">Al elegir un cliente se rellenan contacto, email, teléfono, dirección y notas.</span>
     </label>
     <label>Nombre / contacto
       <input type="text" name="customer_name" id="field-name" placeholder="Nombre del cliente">
     </label>
+    <label>Email
+      <input type="email" name="email" id="field-email" placeholder="avisos de estado" autocomplete="email">
+    </label>
     <label>Teléfono
       <input type="text" name="phone" id="field-phone" placeholder="55… o +52…">
-    </label>
-    <label>Email (avisos de estado)
-      <input type="email" name="email" id="field-email" placeholder="cliente@empresa.com">
     </label>
     <label class="span-2">Dirección
       <input type="text" name="address" id="field-address" placeholder="Calle, colonia, ciudad">
@@ -55,6 +55,16 @@
     <label class="span-2">Notas
       <textarea name="notes" id="field-notes" rows="2" placeholder="Instrucciones de entrega"></textarea>
     </label>
+
+    <div class="span-2 materials-editor">
+      <div class="materials-editor-head">
+        <strong>Material enviado</strong>
+        <button type="button" class="btn btn-sm btn-glass" id="js-add-item">+ Línea</button>
+      </div>
+      <p class="muted small">Agrega una o más líneas: descripción, unidad de medida y cantidad.</p>
+      <div id="materials-rows"></div>
+    </div>
+
     <label>Chofer
       <select name="chofer_id">
         <option value="">— Sin asignar —</option>
@@ -63,32 +73,25 @@
         <% }) %>
       </select>
     </label>
-    <div class="span-2">
-      <h2 class="form-section">Partidas / material</h2>
-      <p class="muted small">Descripción, unidad y cantidad. Deja vacías las filas que no uses.</p>
-      <div class="table-wrap">
-        <table class="table" id="items-table">
-          <thead>
-            <tr><th>Descripción</th><th>UoM</th><th>Cantidad</th></tr>
-          </thead>
-          <tbody>
-            <% for (let i = 0; i < 4; i++) { %>
-            <tr>
-              <td><input type="text" name="item_description" placeholder="Material / servicio"></td>
-              <td><input type="text" name="item_uom" placeholder="PZA, KG…"></td>
-              <td><input type="number" name="item_qty" step="0.01" min="0" placeholder="0"></td>
-            </tr>
-            <% } %>
-          </tbody>
-        </table>
-      </div>
-      <button type="button" class="btn btn-sm btn-glass js-add-item" style="margin-top:.5rem">+ Partida</button>
-    </div>
     <div class="align-end">
       <button type="submit" class="btn btn-glass-hot">Crear pedido</button>
     </div>
   </form>
 </div>
+<template id="material-row-tpl">
+  <div class="material-row">
+    <label>Descripción
+      <input type="text" name="item_description[]" placeholder="Material / producto">
+    </label>
+    <label>Unidad de medida
+      <input type="text" name="item_uom[]" placeholder="PZ, KG, M…" value="PZ">
+    </label>
+    <label>Cantidad
+      <input type="number" name="item_quantity[]" min="0.001" step="any" value="1">
+    </label>
+    <button type="button" class="btn btn-sm btn-danger js-remove-item" title="Quitar línea">×</button>
+  </div>
+</template>
 <script>
 document.querySelector('.js-use-suggest')?.addEventListener('click', function () {
   const code = document.querySelector('.js-suggest-code')?.textContent?.trim();
@@ -116,14 +119,31 @@ document.querySelector('.js-use-suggest')?.addEventListener('click', function ()
   sel.addEventListener('change', apply);
 })();
 
-document.querySelector('.js-add-item')?.addEventListener('click', function () {
-  const tbody = document.querySelector('#items-table tbody');
-  if (!tbody) return;
-  const tr = document.createElement('tr');
-  tr.innerHTML = '<td><input type="text" name="item_description" placeholder="Material / servicio"></td>' +
-    '<td><input type="text" name="item_uom" placeholder="PZA, KG…"></td>' +
-    '<td><input type="number" name="item_qty" step="0.01" min="0" placeholder="0"></td>';
-  tbody.appendChild(tr);
-});
+(function materialsEditor() {
+  const wrap = document.getElementById('materials-rows');
+  const tpl = document.getElementById('material-row-tpl');
+  const addBtn = document.getElementById('js-add-item');
+  if (!wrap || !tpl || !addBtn) return;
+
+  function addRow() {
+    const node = tpl.content.cloneNode(true);
+    const row = node.querySelector('.material-row');
+    row.querySelector('.js-remove-item').addEventListener('click', () => {
+      if (wrap.querySelectorAll('.material-row').length <= 1) {
+        row.querySelectorAll('input').forEach((inp) => {
+          if (inp.name === 'item_quantity[]') inp.value = '1';
+          else if (inp.name === 'item_uom[]') inp.value = 'PZ';
+          else inp.value = '';
+        });
+        return;
+      }
+      row.remove();
+    });
+    wrap.appendChild(node);
+  }
+
+  addBtn.addEventListener('click', addRow);
+  addRow();
+})();
 </script>
 <%- include('partials/foot') %>

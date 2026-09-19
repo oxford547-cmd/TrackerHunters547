@@ -1,6 +1,6 @@
 {
   "name": "pedidoshunters547-node",
-  "version": "1.4.0",
+  "version": "1.6.0",
   "description": "Hunters 547 — SaaS multi-tenant de rastreo de pedidos (superadmin / encargado / chofer / cliente)",
   "main": "server.js",
   "scripts": {

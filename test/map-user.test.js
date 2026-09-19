@@ -20,7 +20,7 @@ test('mapUser expone customer_id y alias cliente_id', () => {
   assert.equal(u.portal_id, 2);
 });
 
-test('mapUser acepta el alias sqlite cliente_id', () => {
+test('mapUser acepta el alias de sesión cliente_id (columna live: customer_id)', () => {
   const u = mapUser({ id: 1, cliente_id: 4, active: false, portal_id: null });
   assert.equal(u.customer_id, 4);
   assert.equal(u.cliente_id, 4);

@@ -1,8 +1,9 @@
-<%- include('partials/head', { withSidebar: true }) %>
+<%- include('partials/head', { withSidebar: true, wide: true }) %>
+<% const pad = typeof formatFolio === 'function' ? formatFolio : (n) => String(n).padStart(4, '0'); %>
 <div class="dash-head">
   <div>
-    <h1 class="dash-title lime">Remisiones provisionales</h1>
-    <p class="muted">Folio consecutivo por portal (<code>portals.remision_next</code>).</p>
+    <h1 class="dash-title lime">Remisión provisional</h1>
+    <p class="muted">Consulta e imprime remisiones del portal<% if (typeof portal !== 'undefined' && portal) { %> · <strong><%= portal.name %></strong><% } %></p>
   </div>
   <div class="dash-actions">
     <a class="btn btn-glass-hot" href="/encargado/remisiones/nueva">+ Nueva remisión</a>
@@ -11,27 +12,33 @@
 
 <div class="card mb">
   <% if (!remisiones.length) { %>
-    <p class="muted">Aún no hay remisiones. <a href="/encargado/remisiones/nueva">Crear la primera</a>.</p>
+    <p class="muted">Aún no hay remisiones. Crea la primera con el botón de arriba.</p>
   <% } else { %>
   <div class="table-wrap">
-    <table class="table">
+    <table class="table table-compact">
       <thead>
         <tr>
           <th>Folio</th>
           <th>Fecha</th>
           <th>Cliente</th>
-          <th>Total</th>
+          <th>Cant. total</th>
+          <th>Importe</th>
+          <th>Creada por</th>
           <th></th>
         </tr>
       </thead>
       <tbody>
         <% remisiones.forEach(r => { %>
         <tr>
-          <td><code><%= r.folio %></code></td>
+          <td><strong><%= pad(r.folio) %></strong></td>
           <td><%= r.fecha %></td>
           <td><%= r.customer_name %></td>
-          <td><%= r.total %></td>
-          <td><a class="btn btn-sm btn-glass" href="/encargado/remisiones/<%= r.id %>">Ver</a></td>
+          <td><%= r.total_cantidad %></td>
+          <td><%= r.total_importe != null && Number(r.total_importe) !== 0 ? Number(r.total_importe).toFixed(2) : '—' %></td>
+          <td class="muted small"><%= r.created_by_name || '—' %></td>
+          <td class="text-right">
+            <a class="btn btn-sm btn-glass" href="/encargado/remisiones/<%= r.id %>">Ver / Imprimir</a>
+          </td>
         </tr>
         <% }) %>
       </tbody>
