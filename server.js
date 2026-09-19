@@ -74,6 +74,9 @@ async function main() {
     res.locals.brandName = res.locals.brandName || 'Hunters 547';
     res.locals.portal = res.locals.portal ?? null;
     res.locals.defaultLogo = res.locals.defaultLogo || '/assets/img/hunters547-logo.jpg';
+    res.locals.mailFrom = res.locals.mailFrom || require('./src/services/email').smtpFrom();
+    res.locals.mailFromAddress =
+      res.locals.mailFromAddress || require('./src/services/email').smtpFromAddress();
 
     if (req.path.startsWith('/api/') || req.headers.accept?.includes('application/json')) {
       const status = err.status || err.statusCode || 500;
