@@ -6,16 +6,18 @@ const { mapUser, mapOrder, asBool01, isUniqueViolation } = require('../src/db');
 
 test('mapUser expone customer_id y alias cliente_id', () => {
   const u = mapUser({
-    id: 3,
+    id: '3',
     username: 'cliente',
     role: 'cliente',
-    customer_id: 9,
+    customer_id: '9',
     active: true,
-    portal_id: 2,
+    portal_id: '2',
   });
+  assert.equal(u.id, 3);
   assert.equal(u.customer_id, 9);
   assert.equal(u.cliente_id, 9);
   assert.equal(u.active, 1);
+  assert.equal(u.portal_id, 2);
 });
 
 test('mapUser acepta el alias sqlite cliente_id', () => {

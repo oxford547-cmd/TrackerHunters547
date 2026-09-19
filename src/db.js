@@ -20,30 +20,47 @@ function asBool01(v) {
   return 0;
 }
 
+function asId(v) {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return Number.isNaN(n) ? v : n;
+}
+
 function toBool(v) {
   return Boolean(asBool01(v));
 }
 
 function mapUser(row) {
   if (!row) return null;
-  const customer_id = row.customer_id ?? row.cliente_id ?? null;
+  const customer_id = asId(row.customer_id ?? row.cliente_id ?? null);
   return {
     ...row,
+    id: asId(row.id),
     customer_id,
     cliente_id: customer_id,
     active: asBool01(row.active),
-    portal_id: row.portal_id ?? null,
+    portal_id: asId(row.portal_id),
   };
 }
 
 function mapPortal(row) {
   if (!row) return null;
-  return { ...row, active: asBool01(row.active), remision_next: Number(row.remision_next || 1) };
+  return {
+    ...row,
+    id: asId(row.id),
+    active: asBool01(row.active),
+    remision_next: Number(row.remision_next || 1),
+  };
 }
 
 function mapCustomer(row) {
   if (!row) return null;
-  return { ...row, active: asBool01(row.active) };
+  return {
+    ...row,
+    id: asId(row.id),
+    portal_id: asId(row.portal_id),
+    active: asBool01(row.active),
+  };
 }
 
 function mapOrder(row) {
@@ -53,7 +70,16 @@ function mapOrder(row) {
     (row.chofer && typeof row.chofer === 'object' ? row.chofer.name : null) ??
     null;
   const { chofer, ...rest } = row;
-  return { ...rest, chofer_name, purchase_order: rest.purchase_order || '' };
+  return {
+    ...rest,
+    id: asId(rest.id),
+    portal_id: asId(rest.portal_id),
+    customer_id: asId(rest.customer_id),
+    chofer_id: asId(rest.chofer_id),
+    created_by: asId(rest.created_by),
+    chofer_name,
+    purchase_order: rest.purchase_order || '',
+  };
 }
 
 function isUniqueViolation(err) {
@@ -788,6 +814,7 @@ module.exports = {
   now,
   generateTrackingCode,
   asBool01,
+  asId,
   toBool,
   mapUser,
   mapPortal,

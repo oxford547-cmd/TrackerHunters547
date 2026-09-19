@@ -78,15 +78,16 @@ function setFlash(req, type, message) {
 }
 
 function sessionUser(row) {
-  const customer_id = row.customer_id ?? row.cliente_id ?? null;
+  const num = (v) => (v == null || v === '' ? null : Number(v));
+  const customer_id = num(row.customer_id ?? row.cliente_id ?? null);
   return {
-    id: row.id,
+    id: num(row.id),
     username: row.username,
     role: row.role,
     name: row.name,
     customer_id,
     cliente_id: customer_id,
-    portal_id: row.portal_id ?? null,
+    portal_id: num(row.portal_id),
   };
 }
 
