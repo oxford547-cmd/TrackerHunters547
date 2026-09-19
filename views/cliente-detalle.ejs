@@ -8,9 +8,13 @@
 <div class="card mb">
   <p><strong><%= order.customer_name %></strong><br>
     <%= order.phone %><br>
+    <% if (order.email) { %><%= order.email %><br><% } %>
     <%= order.address %>
   </p>
+  <% if (order.purchase_order) { %><p class="muted small">OC: <%= order.purchase_order %></p><% } %>
   <% if (order.notes) { %><p class="muted"><%= order.notes %></p><% } %>
+  <%- include('partials/order-materials', { items: typeof items !== 'undefined' ? items : [] }) %>
+  <%- include('partials/order-delivery-proof', { order }) %>
 </div>
 
 <% if (order.status === 'en_camino') { %>

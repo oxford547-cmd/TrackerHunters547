@@ -1,5 +1,7 @@
 'use strict';
 
+require('./env');
+
 /** Status keys → Spanish labels (México) */
 const ORDER_STATUSES = {
   pedido_colocado: 'Pedido colocado',
@@ -29,7 +31,7 @@ const STATUS_BADGE = {
 
 const PORT = Number(process.env.PORT) || 3000;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'hunters547-dev-secret-change-in-prod';
-const DB_PATH = process.env.DB_PATH || require('path').join(__dirname, '..', 'data', 'pedidos.sqlite');
+const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || '').replace(/\/$/, '');
 
 module.exports = {
   ORDER_STATUSES,
@@ -37,5 +39,5 @@ module.exports = {
   STATUS_BADGE,
   PORT,
   SESSION_SECRET,
-  DB_PATH,
+  PUBLIC_BASE_URL,
 };

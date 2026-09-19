@@ -1,0 +1,127 @@
+<%- include('partials/head', { withSidebar: true, wide: true }) %>
+<div class="dash-head">
+  <div>
+    <h1 class="dash-title lime">Nueva remisión provisional</h1>
+    <p class="muted">Folio siguiente: <strong><%= formatFolio(previewFolio) %></strong> · Fecha por defecto hoy</p>
+  </div>
+  <div class="dash-actions">
+    <a class="btn btn-glass" href="/encargado/remisiones">Volver al listado</a>
+  </div>
+</div>
+
+<div class="card mb remision-preview-head">
+  <div class="remision-company">
+    <img class="remision-logo" src="<%= companyLogo %>" alt="<%= companyName %>">
+    <div>
+      <strong><%= companyName || brandName %></strong>
+      <% if (companyAddress) { %><p class="muted small"><%= companyAddress %></p><% } %>
+      <% if (!companyAddress) { %><p class="muted small">Sin dirección de empresa — configúrala en el portal (superadmin).</p><% } %>
+    </div>
+  </div>
+</div>
+
+<div class="card mb">
+  <form method="post" action="/encargado/remisiones" class="form-grid" id="remision-form">
+    <label>Fecha
+      <input type="date" name="fecha" value="<%= today %>" required>
+    </label>
+    <label>Folio (automático)
+      <input type="text" value="<%= formatFolio(previewFolio) %>" disabled>
+    </label>
+    <label class="span-2">Nombre de Cliente *
+      <input type="text" name="customer_name" id="field-customer" list="customers-datalist" required placeholder="Nombre del cliente" autocomplete="off">
+      <datalist id="customers-datalist">
+        <% customers.forEach(c => { %>
+          <option value="<%= c.name %>"></option>
+        <% }) %>
+      </datalist>
+    </label>
+
+    <div class="span-2 materials-editor remision-lines-editor">
+      <div class="materials-editor-head">
+        <strong>Líneas de remisión</strong>
+        <button type="button" class="btn btn-sm btn-glass" id="js-add-rem-item">+ Línea</button>
+      </div>
+      <p class="muted small">Cantidad, unidad, descripción, lote e importe opcional. El folio se asigna al guardar (`portals.remision_next`).</p>
+      <div id="remision-rows"></div>
+    </div>
+
+    <label>Total importe (opcional)
+      <input type="number" name="total_importe" id="field-total-importe" step="0.01" min="0" placeholder="Se calcula de las líneas si vacío">
+      <span class="muted small">Se guarda en <code>remisiones.total</code>.</span>
+    </label>
+    <div class="align-end">
+      <button type="submit" class="btn btn-glass-hot">Guardar remisión</button>
+    </div>
+  </form>
+</div>
+
+<template id="remision-row-tpl">
+  <div class="remision-row">
+    <label>Cantidad
+      <input type="number" name="item_cantidad[]" min="0.001" step="any" value="1" class="js-rem-qty">
+    </label>
+    <label>Unidad
+      <input type="text" name="item_unidad[]" placeholder="PZ, KG…" value="PZ">
+    </label>
+    <label>Descripción
+      <input type="text" name="item_descripcion[]" placeholder="Material / producto">
+    </label>
+    <label>Lote
+      <input type="text" name="item_lote[]" placeholder="Lote (opc.)">
+    </label>
+    <label>Importe
+      <input type="number" name="item_importe[]" min="0" step="0.01" placeholder="Opc." class="js-rem-imp">
+    </label>
+    <button type="button" class="btn btn-sm btn-danger js-remove-rem-item" title="Quitar línea">×</button>
+  </div>
+</template>
+<script>
+(function remisionLines() {
+  const wrap = document.getElementById('remision-rows');
+  const tpl = document.getElementById('remision-row-tpl');
+  const addBtn = document.getElementById('js-add-rem-item');
+  const totalInp = document.getElementById('field-total-importe');
+  if (!wrap || !tpl || !addBtn) return;
+
+  function recalc() {
+    let sum = 0;
+    let any = false;
+    wrap.querySelectorAll('.js-rem-imp').forEach((inp) => {
+      const v = inp.value.trim();
+      if (v === '') return;
+      const n = Number(v);
+      if (Number.isFinite(n)) { sum += n; any = true; }
+    });
+    if (totalInp && document.activeElement !== totalInp) {
+      if (any) totalInp.placeholder = sum.toFixed(2);
+    }
+  }
+
+  function addRow() {
+    const node = tpl.content.cloneNode(true);
+    const row = node.querySelector('.remision-row');
+    row.querySelector('.js-remove-rem-item').addEventListener('click', () => {
+      if (wrap.querySelectorAll('.remision-row').length <= 1) {
+        row.querySelectorAll('input').forEach((inp) => {
+          if (inp.name === 'item_cantidad[]') inp.value = '1';
+          else if (inp.name === 'item_unidad[]') inp.value = 'PZ';
+          else inp.value = '';
+        });
+        recalc();
+        return;
+      }
+      row.remove();
+      recalc();
+    });
+    row.querySelectorAll('.js-rem-imp, .js-rem-qty').forEach((inp) => {
+      inp.addEventListener('input', recalc);
+    });
+    wrap.appendChild(node);
+  }
+
+  addBtn.addEventListener('click', addRow);
+  addRow();
+})();
+</script>
+<%- include('partials/foot') %>
