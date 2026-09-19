@@ -3,14 +3,29 @@
 const { ORDER_STATUSES, PUBLIC_BASE_URL } = require('../constants');
 const { findPortalById } = require('../db');
 
+const DEFAULT_SMTP_FROM = 'Hunters 547 <info@hunters547.cloud>';
+
 function smtpFrom() {
   const primary = String(process.env.SMTP_FROM || '').trim();
   if (primary) return primary;
-  return String(process.env.MAIL_FROM || '').trim();
+  const alias = String(process.env.MAIL_FROM || '').trim();
+  if (alias) return alias;
+  return DEFAULT_SMTP_FROM;
+}
+
+function smtpFromAddress() {
+  const from = smtpFrom();
+  const angled = from.match(/<([^>]+)>/);
+  if (angled) return angled[1].trim();
+  return from;
 }
 
 function hasSmtpCreds() {
-  return Boolean(process.env.SMTP_HOST && smtpFrom());
+  return Boolean(String(process.env.SMTP_HOST || '').trim());
+}
+
+function withSenderFooter(text) {
+  return `${text}\n\n— ${smtpFrom()}`;
 }
 
 function statusLabel(statusKey) {
@@ -37,26 +52,29 @@ function buildOrderMessage(order, portal) {
   if (order.status === 'pedido_colocado') {
     return {
       subject: `${brand}: pedido ${code} registrado`,
-      text:
+      text: withSenderFooter(
         `${brand}: Hola${name ? ',' + name : ''}. ` +
-        `Tu pedido ${code} fue registrado. Estado: ${label}.${track}`,
+          `Tu pedido ${code} fue registrado. Estado: ${label}.${track}`
+      ),
     };
   }
   if (order.status === 'entregado') {
     return {
       subject: `${brand}: pedido ${code} entregado`,
-      text: `${brand}: Tu pedido ${code} fue ${label}. ¡Gracias!${track}`,
+      text: withSenderFooter(`${brand}: Tu pedido ${code} fue ${label}. ¡Gracias!${track}`),
     };
   }
   if (order.status === 'cancelado') {
     return {
       subject: `${brand}: pedido ${code} cancelado`,
-      text: `${brand}: Tu pedido ${code} fue ${label}.${track}`,
+      text: withSenderFooter(`${brand}: Tu pedido ${code} fue ${label}.${track}`),
     };
   }
   return {
     subject: `${brand}: actualización de pedido ${code}`,
-    text: `${brand}: Actualización de tu pedido ${code}. Nuevo estado: ${label}.${track}`,
+    text: withSenderFooter(
+      `${brand}: Actualización de tu pedido ${code}. Nuevo estado: ${label}.${track}`
+    ),
   };
 }
 
@@ -139,7 +157,9 @@ function notifyOrderStatusAsync(order) {
 }
 
 module.exports = {
+  DEFAULT_SMTP_FROM,
   smtpFrom,
+  smtpFromAddress,
   hasSmtpCreds,
   firstEmail,
   buildOrderMessage,

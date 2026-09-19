@@ -67,6 +67,8 @@ async function viewLocals(req, res, next) {
     res.locals.brandLogo = b.brandLogo;
     res.locals.brandName = b.brandName;
     res.locals.defaultLogo = DEFAULT_LOGO;
+    res.locals.mailFrom = require('./services/email').smtpFrom();
+    res.locals.mailFromAddress = require('./services/email').smtpFromAddress();
     next();
   } catch (err) {
     next(err);
