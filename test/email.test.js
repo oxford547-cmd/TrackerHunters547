@@ -7,8 +7,11 @@ delete process.env.SMTP_PASS;
 delete process.env.SMTP_FROM;
 delete process.env.MAIL_FROM;
 
-const { test, beforeEach } = require('node:test');
+const { test, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const {
   firstEmail,
   buildOrderMessage,
@@ -25,6 +28,13 @@ const {
 } = require('../src/services/email');
 const { defaultLogoFile } = require('../src/uploads');
 
+const PNG_1X1 = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'base64'
+);
+
+let tmpUploads;
+
 beforeEach(() => {
   delete process.env.SMTP_HOST;
   delete process.env.SMTP_PORT;
@@ -34,15 +44,34 @@ beforeEach(() => {
   delete process.env.MAIL_FROM;
   delete process.env.PUBLIC_BASE_URL;
   delete process.env.UPLOADS_DIR;
+  tmpUploads = fs.mkdtempSync(path.join(os.tmpdir(), 'h547-email-uploads-'));
+  process.env.UPLOADS_DIR = tmpUploads;
 });
+
+afterEach(() => {
+  delete process.env.UPLOADS_DIR;
+  try {
+    fs.rmSync(tmpUploads, { recursive: true, force: true });
+  } catch (_) {
+    /* ignore */
+  }
+});
+
+function writePortalLogo(portalId, filename, bytes) {
+  const dest = path.join(tmpUploads, 'portals', String(portalId));
+  fs.mkdirSync(dest, { recursive: true });
+  const file = path.join(dest, filename);
+  fs.writeFileSync(file, bytes || PNG_1X1);
+  return file;
+}
 
 test('firstEmail toma el primer valor con @', () => {
   assert.equal(firstEmail('', 'no', 'a@b.com'), 'a@b.com');
   assert.equal(firstEmail('   '), null);
 });
 
-test('plantilla de creado / estado / entregado / cancelado (es)', () => {
-  const created = buildOrderMessage({
+test('plantilla de creado / estado / entregado / cancelado (es)', async () => {
+  const created = await buildOrderMessage({
     tracking_code: 'H547-TEST01',
     status: 'pedido_colocado',
     customer_name: 'García',
@@ -55,24 +84,25 @@ test('plantilla de creado / estado / entregado / cancelado (es)', () => {
   assert.match(created.html, /García/);
   assert.match(created.html, /Pedido colocado/);
 
-  const mid = buildOrderMessage({ tracking_code: 'H547-TEST01', status: 'en_camino' });
+  const mid = await buildOrderMessage({ tracking_code: 'H547-TEST01', status: 'en_camino' });
   assert.match(mid.text, /En camino/);
   assert.match(mid.html, /En camino/);
 
-  const done = buildOrderMessage({ tracking_code: 'H547-TEST01', status: 'entregado' });
+  const done = await buildOrderMessage({ tracking_code: 'H547-TEST01', status: 'entregado' });
   assert.match(done.text, /Entregado/);
   assert.match(done.text, /Gracias/);
   assert.match(done.html, /Gracias/);
 
-  const cancel = buildOrderMessage({ tracking_code: 'H547-TEST01', status: 'cancelado' });
+  const cancel = await buildOrderMessage({ tracking_code: 'H547-TEST01', status: 'cancelado' });
   assert.match(cancel.text, /Cancelado/);
   assert.match(cancel.html, /Cancelado/);
 });
 
-test('HTML incluye detalles, rastreo, nota anti-spam y hunters547.com', () => {
+test('HTML incluye detalles, rastreo, nota anti-spam y hunters547.com', async () => {
   process.env.PUBLIC_BASE_URL = 'https://www.hunters547.cloud';
   process.env.SMTP_FROM = 'info@hunters547.cloud';
-  const msg = buildOrderMessage(
+  const logoFile = writePortalLogo(2, 'logo.png');
+  const msg = await buildOrderMessage(
     {
       tracking_code: 'H547-SMTP-838677',
       purchase_order: 'OC-99',
@@ -108,7 +138,9 @@ test('HTML incluye detalles, rastreo, nota anti-spam y hunters547.com', () => {
   assert.equal(msg.attachments.length, 1);
   assert.equal(msg.attachments[0].cid, EMAIL_LOGO_CID);
   assert.equal(msg.attachments[0].contentDisposition, 'inline');
-  assert.equal(msg.attachments[0].path, defaultLogoFile());
+  assert.equal(msg.attachments[0].path, logoFile);
+  assert.notEqual(msg.attachments[0].path, defaultLogoFile());
+  assert.equal(msg.attachments[0].filename, 'logo.png');
   assert.match(
     msg.html,
     /href="https:\/\/www\.hunters547\.cloud\/rastreo\?codigo=H547-SMTP-838677"/
@@ -117,29 +149,53 @@ test('HTML incluye detalles, rastreo, nota anti-spam y hunters547.com', () => {
   assert.match(msg.html, new RegExp(`href="${HUNTERS_SITE_URL.replace(/\./g, '\\.')}"`));
 });
 
-test('logo_path de /uploads ausente no emite img rota; usa CID del logo Hunters 547', () => {
-  process.env.PUBLIC_BASE_URL = 'https://www.hunters547.cloud';
-  const msg = buildOrderMessage(
-    { tracking_code: 'H547-TEST01', status: 'confirmado' },
+test('portal con logo en disco usa CID del portal, no Hunters 547', async () => {
+  const logoFile = writePortalLogo(2, 'logo.png');
+  const msg = await buildOrderMessage(
+    { tracking_code: 'H547-LOGO-840646', status: 'en_camino' },
     { name: 'Marca ACME', logo_path: '/uploads/portals/2/logo.png' }
   );
   assert.doesNotMatch(msg.html, /src="[^"]*\/uploads\//i);
   assert.doesNotMatch(msg.html, /src="https?:\/\//i);
-  assert.match(msg.html, /Marca ACME/);
+  assert.match(msg.html, /alt="Marca ACME"/);
   assert.match(msg.html, new RegExp(`src="cid:${EMAIL_LOGO_CID}"`));
   assert.equal(msg.attachments.length, 1);
-  assert.equal(msg.attachments[0].path, defaultLogoFile());
+  assert.equal(msg.attachments[0].path, logoFile);
+  assert.notEqual(msg.attachments[0].path, defaultLogoFile());
+  assert.equal(msg.attachments[0].filename, 'logo.png');
 });
 
-test('sin logo_path tampoco pone img remota; CID del fallback si el archivo existe', () => {
+test('logo_path ausente en disco y sin HTTP usa CID del logo Hunters 547', async () => {
   process.env.PUBLIC_BASE_URL = 'https://www.hunters547.cloud';
-  const msg = buildOrderMessage(
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response('', { status: 404 });
+  try {
+    const msg = await buildOrderMessage(
+      { tracking_code: 'H547-TEST01', status: 'confirmado' },
+      { name: 'Marca ACME', logo_path: '/uploads/portals/2/logo.png' }
+    );
+    assert.doesNotMatch(msg.html, /src="[^"]*\/uploads\//i);
+    assert.doesNotMatch(msg.html, /src="https?:\/\//i);
+    assert.match(msg.html, /Marca ACME/);
+    assert.match(msg.html, new RegExp(`src="cid:${EMAIL_LOGO_CID}"`));
+    assert.equal(msg.attachments.length, 1);
+    assert.equal(msg.attachments[0].path, defaultLogoFile());
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('sin logo_path tampoco pone img remota; CID del fallback si el archivo existe', async () => {
+  process.env.PUBLIC_BASE_URL = 'https://www.hunters547.cloud';
+  const msg = await buildOrderMessage(
     { tracking_code: 'H547-TEST01', status: 'confirmado' },
     { name: 'Marca ACME', logo_path: null }
   );
   assert.doesNotMatch(msg.html, /src="[^"]*\/uploads\//i);
   assert.match(msg.html, /Marca ACME/);
   assert.match(msg.html, new RegExp(`src="cid:${EMAIL_LOGO_CID}"`));
+  assert.equal(msg.attachments[0].path, defaultLogoFile());
+  assert.equal(msg.attachments[0].filename, 'hunters547-logo.jpg');
 });
 
 test('portalLogoSrc no construye URL pública a un /uploads inexistente', () => {
@@ -152,8 +208,8 @@ test('portalLogoSrc no construye URL pública a un /uploads inexistente', () => 
   assert.equal(portalLogoSrc({ logo_path: 'https://cdn.example/logo.png' }), 'https://cdn.example/logo.png');
 });
 
-test('escapa HTML en campos del pedido', () => {
-  const msg = buildOrderMessage(
+test('escapa HTML en campos del pedido', async () => {
+  const msg = await buildOrderMessage(
     {
       tracking_code: 'H547-<xss>',
       customer_name: '<script>alert(1)</script>',
@@ -221,8 +277,8 @@ test('SMTP_FROM habilita envío; MAIL_FROM es alias', () => {
   assert.equal(formatFromHeader(smtpFrom()), 'Notificaciones <hello@yourdomain>');
 });
 
-test('asunto usa la marca del portal', () => {
-  const msg = buildOrderMessage(
+test('asunto usa la marca del portal', async () => {
+  const msg = await buildOrderMessage(
     { tracking_code: 'H547-TEST01', status: 'pedido_colocado', customer_name: 'García' },
     { name: 'Logística Norte' }
   );

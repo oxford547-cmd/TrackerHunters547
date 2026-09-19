@@ -2,7 +2,7 @@
 
 const { ORDER_STATUSES } = require('../constants');
 const { findPortalById, listOrderItems } = require('../db');
-const { resolveEmailLogo, EMAIL_LOGO_CID } = require('../uploads');
+const { resolveEmailLogo, resolveEmailLogoSync, EMAIL_LOGO_CID } = require('../uploads');
 const FROM_DISPLAY_NAME = 'Notificaciones';
 const HUNTERS_SITE_URL = 'https://www.hunters547.com';
 const HUNTERS_SITE_LABEL = 'www.hunters547.com';
@@ -56,8 +56,7 @@ function firstEmail(...candidates) {
 }
 
 function portalLogoSrc(portal) {
-  const resolved = resolveEmailLogo(portal);
-  return resolved.src;
+  return resolveEmailLogoSync(portal).src;
 }
 
 function trackingUrl(code) {
@@ -270,12 +269,12 @@ function buildOrderHtml(order, portal, extras) {
 </html>`;
 }
 
-function buildOrderMessage(order, portal) {
+async function buildOrderMessage(order, portal) {
   const safeOrder = order || {};
   const brand = (portal && portal.name) || 'Hunters 547';
   const code = safeOrder.tracking_code || '—';
   const fromRaw = smtpFrom();
-  const logo = resolveEmailLogo(portal);
+  const logo = await resolveEmailLogo(portal);
   const extras = {
     subject: subjectFor(safeOrder.status, brand, code),
     items: normalizeItems(safeOrder),
@@ -379,7 +378,7 @@ async function notifyOrderStatus(order) {
     });
     return { ok: false, error: 'invalid_email' };
   }
-  const msg = buildOrderMessage(enriched, portal);
+  const msg = await buildOrderMessage(enriched, portal);
   return sendMail({
     to,
     subject: msg.subject,
