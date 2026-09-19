@@ -137,12 +137,11 @@ async function markDelivered(req, res) {
     created_at: ts,
   });
   notifyOrderStatusAsync({
-    tracking_code: order.tracking_code,
+    ...order,
     status: 'entregado',
-    phone: order.phone,
-    email: order.email,
-    customer_name: order.customer_name,
-    portal_id: order.portal_id,
+    previous_status: order.status,
+    updated_at: ts,
+    delivered_at: ts,
   });
   return res.json({ ok: true, status: 'entregado', label: ORDER_STATUSES.entregado });
 }

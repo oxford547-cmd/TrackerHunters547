@@ -16,7 +16,7 @@ Completa `.env` (nunca subas secretos):
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role (servidor). Alias: `SUPABASE_API_KEY` |
 | `SESSION_SECRET` | Cookie de sesión |
 
-Opcional: `PORT` (default 3000), `PUBLIC_BASE_URL`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`. Sin SMTP los avisos solo van a consola.
+Opcional: `PORT` (default 3000), `PUBLIC_BASE_URL`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` (alias `MAIL_FROM`). El remitente visible es **Notificaciones** `<SMTP_FROM>`. Sin SMTP los avisos HTML solo van a consola.
 
 ```bash
 npm install
