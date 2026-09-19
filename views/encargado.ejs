@@ -89,6 +89,7 @@
       <thead>
         <tr>
           <th>Nº pedido</th>
+          <th>OC</th>
           <th>Cliente</th>
           <th>Estado</th>
           <th>Chofer</th>
@@ -103,6 +104,7 @@
             <a class="small" href="/rastreo?codigo=<%= encodeURIComponent(o.tracking_code) %>" target="_blank">Rastreo</a>
             <div class="muted small"><%= o.created_at %></div>
           </td>
+          <td><%= o.purchase_order || '—' %></td>
           <td>
             <strong><%= o.customer_name %></strong>
             <div class="muted small"><%= o.phone %></div>

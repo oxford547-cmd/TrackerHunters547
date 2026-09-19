@@ -736,3 +736,24 @@ body.sidebar-collapsed .app-main { width: 100%; }
   color: inherit;
   font: inherit;
 }
+.sig-pad {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  height: 140px;
+  background: #fff;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  touch-action: none;
+  margin: .35rem 0;
+}
+.remision-head {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+@media print {
+  .no-print, .topbar, .sidebar, .sidebar-backdrop { display: none !important; }
+  body, .card { background: #fff; color: #111; box-shadow: none; }
+}

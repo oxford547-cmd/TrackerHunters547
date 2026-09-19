@@ -21,26 +21,33 @@
         <button type="button" class="btn btn-sm btn-glass js-use-suggest" style="margin-left:.35rem">Usar sugerencia</button>
       </span>
     </label>
+    <label>Orden de compra (OC)
+      <input type="text" name="purchase_order" maxlength="80" placeholder="OC / referencia del cliente">
+    </label>
     <label>Cliente existente (alta)
       <select name="customer_id" id="customer-select">
-        <option value="" data-name="" data-phone="" data-address="" data-notes="">— Nuevo / manual —</option>
+        <option value="" data-name="" data-phone="" data-email="" data-address="" data-notes="">— Nuevo / manual —</option>
         <% customers.forEach(c => { %>
           <option value="<%= c.id %>"
                   data-name="<%= c.name %>"
                   data-phone="<%= c.phone || '' %>"
+                  data-email="<%= c.email || '' %>"
                   data-address="<%= c.address || '' %>"
                   data-notes="<%= c.notes || '' %>">
             <%= c.name %> (<%= c.phone || 'sin tel' %>)
           </option>
         <% }) %>
       </select>
-      <span class="muted small">Al elegir un cliente se rellenan contacto, teléfono, dirección y notas.</span>
+      <span class="muted small">Al elegir un cliente se rellenan contacto, teléfono, email, dirección y notas.</span>
     </label>
     <label>Nombre / contacto
       <input type="text" name="customer_name" id="field-name" placeholder="Nombre del cliente">
     </label>
     <label>Teléfono
       <input type="text" name="phone" id="field-phone" placeholder="55… o +52…">
+    </label>
+    <label>Email (avisos de estado)
+      <input type="email" name="email" id="field-email" placeholder="cliente@empresa.com">
     </label>
     <label class="span-2">Dirección
       <input type="text" name="address" id="field-address" placeholder="Calle, colonia, ciudad">
@@ -56,6 +63,27 @@
         <% }) %>
       </select>
     </label>
+    <div class="span-2">
+      <h2 class="form-section">Partidas / material</h2>
+      <p class="muted small">Descripción, unidad y cantidad. Deja vacías las filas que no uses.</p>
+      <div class="table-wrap">
+        <table class="table" id="items-table">
+          <thead>
+            <tr><th>Descripción</th><th>UoM</th><th>Cantidad</th></tr>
+          </thead>
+          <tbody>
+            <% for (let i = 0; i < 4; i++) { %>
+            <tr>
+              <td><input type="text" name="item_description" placeholder="Material / servicio"></td>
+              <td><input type="text" name="item_uom" placeholder="PZA, KG…"></td>
+              <td><input type="number" name="item_qty" step="0.01" min="0" placeholder="0"></td>
+            </tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+      <button type="button" class="btn btn-sm btn-glass js-add-item" style="margin-top:.5rem">+ Partida</button>
+    </div>
     <div class="align-end">
       <button type="submit" class="btn btn-glass-hot">Crear pedido</button>
     </div>
@@ -73,6 +101,7 @@ document.querySelector('.js-use-suggest')?.addEventListener('click', function ()
   if (!sel) return;
   const name = document.getElementById('field-name');
   const phone = document.getElementById('field-phone');
+  const email = document.getElementById('field-email');
   const address = document.getElementById('field-address');
   const notes = document.getElementById('field-notes');
   function apply() {
@@ -80,10 +109,21 @@ document.querySelector('.js-use-suggest')?.addEventListener('click', function ()
     if (!opt || !opt.value) return;
     if (name) name.value = opt.getAttribute('data-name') || '';
     if (phone) phone.value = opt.getAttribute('data-phone') || '';
+    if (email) email.value = opt.getAttribute('data-email') || '';
     if (address) address.value = opt.getAttribute('data-address') || '';
     if (notes) notes.value = opt.getAttribute('data-notes') || '';
   }
   sel.addEventListener('change', apply);
 })();
+
+document.querySelector('.js-add-item')?.addEventListener('click', function () {
+  const tbody = document.querySelector('#items-table tbody');
+  if (!tbody) return;
+  const tr = document.createElement('tr');
+  tr.innerHTML = '<td><input type="text" name="item_description" placeholder="Material / servicio"></td>' +
+    '<td><input type="text" name="item_uom" placeholder="PZA, KG…"></td>' +
+    '<td><input type="number" name="item_qty" step="0.01" min="0" placeholder="0"></td>';
+  tbody.appendChild(tr);
+});
 </script>
 <%- include('partials/foot') %>

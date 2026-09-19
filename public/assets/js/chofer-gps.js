@@ -3,6 +3,56 @@
 (function () {
   const watchers = new Map();
 
+  function pad(el) {
+    return document.querySelector('.js-signature[data-order-id="' + el + '"]');
+  }
+
+  document.querySelectorAll('.js-signature').forEach((canvas) => {
+    const ctx = canvas.getContext('2d');
+    ctx.strokeStyle = '#111';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    let drawing = false;
+    function pos(ev) {
+      const r = canvas.getBoundingClientRect();
+      const t = ev.touches ? ev.touches[0] : ev;
+      return { x: t.clientX - r.left, y: t.clientY - r.top };
+    }
+    function start(ev) {
+      drawing = true;
+      const p = pos(ev);
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ev.preventDefault();
+    }
+    function move(ev) {
+      if (!drawing) return;
+      const p = pos(ev);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      ev.preventDefault();
+    }
+    function end() {
+      drawing = false;
+    }
+    canvas.addEventListener('mousedown', start);
+    canvas.addEventListener('mousemove', move);
+    canvas.addEventListener('mouseup', end);
+    canvas.addEventListener('mouseleave', end);
+    canvas.addEventListener('touchstart', start, { passive: false });
+    canvas.addEventListener('touchmove', move, { passive: false });
+    canvas.addEventListener('touchend', end);
+  });
+
+  document.querySelectorAll('.js-clear-sig').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const canvas = pad(btn.dataset.orderId);
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    });
+  });
+
   async function postLocation(orderId, pos) {
     const body = {
       order_id: orderId,
@@ -77,10 +127,24 @@
         watchers.delete(orderId);
       }
       try {
+        const fd = new FormData();
+        fd.append('order_id', String(orderId));
+        fd.append('status', 'entregado');
+        const photo = document.querySelector('.js-delivery-photo[data-order-id="' + orderId + '"]');
+        if (photo && photo.files && photo.files[0]) fd.append('photo', photo.files[0]);
+        const canvas = pad(orderId);
+        if (canvas) {
+          const blank = document.createElement('canvas');
+          blank.width = canvas.width;
+          blank.height = canvas.height;
+          if (canvas.toDataURL() !== blank.toDataURL()) {
+            fd.append('signature', canvas.toDataURL('image/png'));
+          }
+        }
         const res = await fetch('/api/status', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({ order_id: orderId, status: 'entregado' }),
+          headers: { Accept: 'application/json' },
+          body: fd,
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.ok) throw new Error(data.error || 'Error');

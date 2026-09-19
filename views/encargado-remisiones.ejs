@@ -1,0 +1,42 @@
+<%- include('partials/head', { withSidebar: true }) %>
+<div class="dash-head">
+  <div>
+    <h1 class="dash-title lime">Remisiones provisionales</h1>
+    <p class="muted">Folio consecutivo por portal (<code>portals.remision_next</code>).</p>
+  </div>
+  <div class="dash-actions">
+    <a class="btn btn-glass-hot" href="/encargado/remisiones/nueva">+ Nueva remisión</a>
+  </div>
+</div>
+
+<div class="card mb">
+  <% if (!remisiones.length) { %>
+    <p class="muted">Aún no hay remisiones. <a href="/encargado/remisiones/nueva">Crear la primera</a>.</p>
+  <% } else { %>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Folio</th>
+          <th>Fecha</th>
+          <th>Cliente</th>
+          <th>Total</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% remisiones.forEach(r => { %>
+        <tr>
+          <td><code><%= r.folio %></code></td>
+          <td><%= r.fecha %></td>
+          <td><%= r.customer_name %></td>
+          <td><%= r.total %></td>
+          <td><a class="btn btn-sm btn-glass" href="/encargado/remisiones/<%= r.id %>">Ver</a></td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <% } %>
+</div>
+<%- include('partials/foot') %>

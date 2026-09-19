@@ -8,9 +8,26 @@
 <div class="card mb">
   <p><strong><%= order.customer_name %></strong><br>
     <%= order.phone %><br>
+    <% if (order.email) { %><%= order.email %><br><% } %>
     <%= order.address %>
   </p>
+  <% if (order.purchase_order) { %><p class="muted small">OC: <%= order.purchase_order %></p><% } %>
   <% if (order.notes) { %><p class="muted"><%= order.notes %></p><% } %>
+  <% if (typeof items !== 'undefined' && items && items.length) { %>
+    <ul class="list-plain">
+      <% items.forEach(it => { %>
+        <li><%= it.quantity %> <%= it.uom %> — <%= it.description %></li>
+      <% }) %>
+    </ul>
+  <% } %>
+  <% if (order.delivery_photo_path) { %>
+    <p class="muted small">Evidencia de entrega</p>
+    <img class="logo-preview" src="<%= order.delivery_photo_path %>" alt="Foto de entrega">
+  <% } %>
+  <% if (order.delivery_signature_path) { %>
+    <p class="muted small">Firma</p>
+    <img class="logo-preview" src="<%= order.delivery_signature_path %>" alt="Firma">
+  <% } %>
 </div>
 
 <% if (order.status === 'en_camino') { %>

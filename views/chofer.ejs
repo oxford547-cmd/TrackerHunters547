@@ -28,6 +28,12 @@
         Compartir ubicación en vivo
       </button>
       <p class="gps-status muted small" id="gps-status-<%= o.id %>">GPS inactivo</p>
+      <label class="small">Foto de entrega
+        <input type="file" accept="image/*" capture="environment" class="js-delivery-photo" data-order-id="<%= o.id %>">
+      </label>
+      <p class="muted small">Firma del receptor</p>
+      <canvas class="sig-pad js-signature" data-order-id="<%= o.id %>" width="320" height="140"></canvas>
+      <button type="button" class="btn btn-sm btn-glass js-clear-sig" data-order-id="<%= o.id %>">Borrar firma</button>
       <button type="button" class="btn btn-ok btn-block js-mark-delivered" data-order-id="<%= o.id %>">
         Marcar Entregado
       </button>

@@ -2,6 +2,10 @@
 
 const { getPortal, branding, DEFAULT_LOGO } = require('./portal');
 
+function wrap(fn) {
+  return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+}
+
 function requireAuth(req, res, next) {
   if (!req.session || !req.session.user) {
     if (req.path.startsWith('/api/') || req.xhr || req.headers.accept?.includes('application/json')) {
@@ -44,25 +48,29 @@ function requirePortal(req, res, next) {
 }
 
 /** Locals for all views */
-function viewLocals(req, res, next) {
-  res.locals.user = req.session?.user || null;
-  res.locals.flash = req.session?.flash || null;
-  if (req.session) delete req.session.flash;
-  res.locals.ORDER_STATUSES = require('./constants').ORDER_STATUSES;
-  res.locals.STATUS_BADGE = require('./constants').STATUS_BADGE;
-  res.locals.statusLabel = (s) => require('./constants').ORDER_STATUSES[s] || s;
-  res.locals.badgeClass = (s) => require('./constants').STATUS_BADGE[s] || 'badge-muted';
+async function viewLocals(req, res, next) {
+  try {
+    res.locals.user = req.session?.user || null;
+    res.locals.flash = req.session?.flash || null;
+    if (req.session) delete req.session.flash;
+    res.locals.ORDER_STATUSES = require('./constants').ORDER_STATUSES;
+    res.locals.STATUS_BADGE = require('./constants').STATUS_BADGE;
+    res.locals.statusLabel = (s) => require('./constants').ORDER_STATUSES[s] || s;
+    res.locals.badgeClass = (s) => require('./constants').STATUS_BADGE[s] || 'badge-muted';
 
-  let portal = null;
-  if (req.session?.user?.portal_id) {
-    portal = getPortal(req.session.user.portal_id);
+    let portal = null;
+    if (req.session?.user?.portal_id) {
+      portal = await getPortal(req.session.user.portal_id);
+    }
+    const b = branding(portal);
+    res.locals.portal = b.portal;
+    res.locals.brandLogo = b.brandLogo;
+    res.locals.brandName = b.brandName;
+    res.locals.defaultLogo = DEFAULT_LOGO;
+    next();
+  } catch (err) {
+    next(err);
   }
-  const b = branding(portal);
-  res.locals.portal = b.portal;
-  res.locals.brandLogo = b.brandLogo;
-  res.locals.brandName = b.brandName;
-  res.locals.defaultLogo = DEFAULT_LOGO;
-  next();
 }
 
 function setFlash(req, type, message) {
@@ -70,17 +78,20 @@ function setFlash(req, type, message) {
 }
 
 function sessionUser(row) {
+  const customer_id = row.customer_id ?? row.cliente_id ?? null;
   return {
     id: row.id,
     username: row.username,
     role: row.role,
     name: row.name,
-    cliente_id: row.cliente_id ?? null,
+    customer_id,
+    cliente_id: customer_id,
     portal_id: row.portal_id ?? null,
   };
 }
 
 module.exports = {
+  wrap,
   requireAuth,
   requireRole,
   requirePortal,
