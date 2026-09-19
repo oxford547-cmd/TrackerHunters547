@@ -1,7 +1,7 @@
 <%- include('partials/head', { narrow: true, withSidebar: true, activeNav: 'chofer' }) %>
 <div class="page-head">
   <h1>Mis entregas</h1>
-  <p class="muted">Cuando el pedido esté <strong>En camino</strong>, comparte GPS y marca Entregado.</p>
+  <p class="muted">Cuando el pedido esté <strong>En camino</strong>, comparte GPS y marca Entregado (foto + firma obligatorias).</p>
 </div>
 
 <% if (!orders.length) { %>
@@ -20,7 +20,11 @@
     <span class="muted"><%= o.phone %></span><br>
     <%= o.address %>
   </p>
+  <% if (o.purchase_order) { %>
+    <p class="muted small"><strong>OC:</strong> <%= o.purchase_order %></p>
+  <% } %>
   <% if (o.notes) { %><p class="muted small"><%= o.notes %></p><% } %>
+  <%- include('partials/order-materials', { items: o.items || [] }) %>
 
   <% if (o.status === 'en_camino') { %>
     <div class="gps-box">
@@ -28,7 +32,7 @@
         Compartir ubicación en vivo
       </button>
       <p class="gps-status muted small" id="gps-status-<%= o.id %>">GPS inactivo</p>
-      <button type="button" class="btn btn-ok btn-block js-mark-delivered" data-order-id="<%= o.id %>">
+      <button type="button" class="btn btn-ok btn-block js-mark-delivered" data-order-id="<%= o.id %>" data-code="<%= o.tracking_code %>">
         Marcar Entregado
       </button>
     </div>
@@ -43,10 +47,39 @@
   <h2>Entregados recientes</h2>
   <ul class="list-plain">
     <% recent.forEach(o => { %>
-      <li><code><%= o.tracking_code %></code> — <%= o.customer_name %> <span class="muted small"><%= o.delivered_at %></span></li>
+      <li>
+        <code><%= o.tracking_code %></code> — <%= o.customer_name %>
+        <span class="muted small"><%= o.delivered_at %></span>
+        <% if (o.purchase_order) { %><span class="muted small">· OC <%= o.purchase_order %></span><% } %>
+        <%- include('partials/order-materials', { items: o.items || [] }) %>
+        <%- include('partials/order-delivery-proof', { order: o }) %>
+      </li>
     <% }) %>
   </ul>
 </div>
 <% } %>
+
+<!-- Modal evidencia de entrega -->
+<div id="delivery-modal" class="modal" hidden>
+  <div class="modal-backdrop js-close-delivery"></div>
+  <div class="modal-panel card" role="dialog" aria-labelledby="delivery-modal-title">
+    <div class="dash-card-head">
+      <h2 id="delivery-modal-title">Evidencia de entrega</h2>
+      <button type="button" class="btn btn-sm btn-glass js-close-delivery">Cerrar</button>
+    </div>
+    <p class="muted small">Pedido <code id="delivery-modal-code"></code> — foto y firma obligatorias.</p>
+    <label class="block-label">Foto de entrega
+      <input type="file" id="delivery-photo" accept="image/*" capture="environment">
+    </label>
+    <div id="delivery-photo-preview" class="proof-preview muted small">Sin foto seleccionada</div>
+    <label class="block-label">Firma del receptor</label>
+    <canvas id="signature-pad" width="320" height="160" class="signature-pad"></canvas>
+    <div class="form-row" style="margin-top:.5rem">
+      <button type="button" class="btn btn-sm btn-glass" id="js-clear-sig">Limpiar firma</button>
+      <button type="button" class="btn btn-ok" id="js-confirm-delivery">Confirmar Entregado</button>
+    </div>
+    <p class="muted small" id="delivery-modal-err" style="color:#d56767"></p>
+  </div>
+</div>
 
 <%- include('partials/foot', { scripts: '<script src="/assets/js/chofer-gps.js"></script>' }) %>

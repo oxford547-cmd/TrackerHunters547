@@ -15,6 +15,15 @@ function wipePortalUploads() {
   }
 }
 
+function wipeDeliveryUploads() {
+  const root = path.join(__dirname, '..', 'public', 'uploads', 'deliveries');
+  fs.mkdirSync(root, { recursive: true });
+  for (const name of fs.readdirSync(root)) {
+    if (name === '.gitkeep') continue;
+    fs.rmSync(path.join(root, name), { recursive: true, force: true });
+  }
+}
+
 function seed(force = false) {
   ensureSchema();
   const d = getDb();
@@ -31,12 +40,14 @@ function seed(force = false) {
       d.exec(`
         DELETE FROM location_updates;
         DELETE FROM status_history;
+        DELETE FROM order_items;
         DELETE FROM orders;
         DELETE FROM users;
         DELETE FROM customers;
         DELETE FROM portals;
       `);
       wipePortalUploads();
+      wipeDeliveryUploads();
     }
 
     const ts = now();

@@ -19,6 +19,8 @@ data/*.sqlite-*
 # Uploaded tenant files (logos / private assets)
 public/uploads/portals/*
 !public/uploads/portals/.gitkeep
+public/uploads/deliveries/*
+!public/uploads/deliveries/.gitkeep
 /uploads/
 
 # Logs and OS

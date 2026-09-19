@@ -22,6 +22,11 @@
   <p><strong><%= order.customer_name %></strong><br>
     <span class="muted"><%= order.address %></span>
   </p>
+  <% if (order.purchase_order) { %>
+    <p><strong>Nº Orden de Compra:</strong> <%= order.purchase_order %></p>
+  <% } %>
+  <%- include('partials/order-materials', { items: typeof items !== 'undefined' ? items : [] }) %>
+  <%- include('partials/order-delivery-proof', { order }) %>
 </div>
 
 <% if (order.status === 'en_camino') { %>
