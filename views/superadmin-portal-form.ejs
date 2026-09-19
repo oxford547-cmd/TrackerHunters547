@@ -26,10 +26,10 @@
     <label>Teléfono
       <input type="text" name="phone" value="<%= portal.phone %>">
     </label>
-    <label>WhatsApp (actualizaciones) *
+    <label>WhatsApp (opcional)
       <input type="text" name="whatsapp_number" value="<%= portal.whatsapp_number || '' %>"
-             required placeholder="55… o +52…" inputmode="tel">
-      <span class="muted small">Obligatorio. Remitente preferido para avisos WhatsApp de este portal.</span>
+             placeholder="55… o +52…" inputmode="tel">
+      <span class="muted small">Reservado para uso futuro. Los avisos de estado se envían por <strong>email</strong>.</span>
     </label>
     <label>Email
       <input type="email" name="email" value="<%= portal.email %>">
@@ -39,6 +39,10 @@
         <input type="checkbox" name="active" value="1" <%= portal.active ? 'checked' : '' %>>
         Portal habilitado para login
       </span>
+    </label>
+    <label class="span-2">Dirección de la empresa
+      <input type="text" name="address" value="<%= portal.address || '' %>" placeholder="Calle, colonia, ciudad, CP">
+      <span class="muted small">Se imprime en remisiones provisionales. Si está vacío se usan las notas.</span>
     </label>
     <label class="span-2">Notas
       <textarea name="notes" rows="2"><%= portal.notes %></textarea>

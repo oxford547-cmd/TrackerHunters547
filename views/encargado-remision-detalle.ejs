@@ -1,0 +1,70 @@
+<%- include('partials/head', { withSidebar: true, wide: true }) %>
+<div class="dash-head no-print">
+  <div>
+    <h1 class="dash-title lime">Remisión <%= String(remision.folio).padStart(4, '0') %></h1>
+    <p class="muted">Documento provisional · <%= remision.fecha %></p>
+  </div>
+  <div class="dash-actions">
+    <a class="btn btn-glass" href="/encargado/remisiones">Listado</a>
+    <a class="btn btn-glass" href="/encargado/remisiones/nueva">Nueva</a>
+    <button type="button" class="btn btn-glass-hot" onclick="window.print()">Imprimir</button>
+  </div>
+</div>
+
+<article class="remision-doc card mb" id="remision-print">
+  <header class="remision-doc-head">
+    <div class="remision-company">
+      <img class="remision-logo" src="<%= printLogo || brandLogo %>" alt="<%= remision.company_name %>">
+      <div>
+        <h2 class="remision-company-name"><%= remision.company_name %></h2>
+        <% if (remision.company_address) { %>
+          <p class="remision-company-addr"><%= remision.company_address %></p>
+        <% } %>
+      </div>
+    </div>
+    <div class="remision-meta">
+      <p class="remision-title">Remisión provisional</p>
+      <p><strong>Folio:</strong> <%= String(remision.folio).padStart(4, '0') %></p>
+      <p><strong>Fecha:</strong> <%= remision.fecha %></p>
+    </div>
+  </header>
+
+  <section class="remision-client">
+    <p><strong>Nombre de Cliente:</strong> <%= remision.customer_name %></p>
+  </section>
+
+  <table class="table remision-table">
+    <thead>
+      <tr>
+        <th>Cantidad</th>
+        <th>Unidad</th>
+        <th>Descripción</th>
+        <th>Lote</th>
+        <th class="text-right">Importe</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% items.forEach(it => { %>
+      <tr>
+        <td><%= it.cantidad %></td>
+        <td><%= it.unidad %></td>
+        <td><%= it.descripcion %></td>
+        <td><%= it.lote || '—' %></td>
+        <td class="text-right"><%= it.importe != null ? Number(it.importe).toFixed(2) : '—' %></td>
+      </tr>
+      <% }) %>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td><strong><%= remision.total_cantidad %></strong></td>
+        <td colspan="3" class="text-right"><strong>Total</strong></td>
+        <td class="text-right"><strong><%= remision.total_importe != null ? Number(remision.total_importe).toFixed(2) : '—' %></strong></td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <footer class="remision-doc-foot">
+    <p class="muted small">Documento provisional · No es factura fiscal<% if (creator && creator.name) { %> · Registró: <%= creator.name %><% } %></p>
+  </footer>
+</article>
+<%- include('partials/foot') %>

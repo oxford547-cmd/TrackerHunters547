@@ -1,10 +1,27 @@
 # TrackerHunters547 — rastreo de pedidos (Node, multi-tenant)
 
-Aplicación **Node.js + Express** para la agencia **Hunters 547**: portales de clientes, dashboard de encargado, choferes con GPS y rastreo público. Versión **1.3.0**.
+Aplicación **Node.js + Express** para la agencia **Hunters 547**: portales de clientes, dashboard de encargado, choferes con GPS y rastreo público. Versión **1.6.0**.
 
-Demo local con **SQLite**. Más adelante se puede sustituir la persistencia por **Supabase** (Postgres) sin cambiar el modelo de roles ni el flujo de pedidos.
+Demo local con **SQLite**. Persistencia en **Supabase** (Postgres) queda prevista para más adelante; este repo no incluye esquema ni migraciones de Supabase.
 
 Marca tenant: lime `#84BD00`, charcoal `#232323`. Dashboard superadmin: carbón profundo, acentos naranja→rojo.
+
+## Versión 1.6.0
+
+- **Remisión provisional** (menú encargado): crear, listar e imprimir remisiones por portal.
+- Folio consecutivo por portal (`portals.remision_next` + `UNIQUE(portal_id, folio)`).
+- Tablas SQLite `remisiones` / `remision_items` (cantidad, unidad, descripción, lote, importe opcional; total cantidades e importe).
+- Documento imprimible con logo del portal (o H547), nombre y dirección de empresa (`portals.address`; si falta, notas).
+- Campo **Dirección** en alta/edición de portal (superadmin).
+
+## Versión 1.5.0
+
+- **Notificaciones por email** (SMTP / nodemailer): al crear un pedido y en cada cambio de estado hasta Entregado (y cancelación). Reemplaza WhatsApp como canal de avisos de estado.
+- Clientes: campo opcional `email`; Nuevo pedido / Altas clientes lo capturan.
+- **Orden de compra** (`purchase_order`) en alta de pedido y vistas de detalle / cliente / chofer / rastreo.
+- **Material enviado**: tabla hija `order_items` (description, uom, quantity); líneas add/remove en Nuevo pedido.
+- **Entrega con evidencia**: al marcar **Entregado**, el chofer debe subir **foto** y capturar **firma** (canvas). Se guardan en `public/uploads/deliveries/{orderId}/`. Sin ambas, no se completa la entrega.
+- Detalle encargado: `/encargado/pedido/:id`.
 
 ## Cómo correr
 
@@ -21,22 +38,27 @@ Abre **http://localhost:3000/** (login en `/login`).
 | `PORT` | `3000` |
 | `SESSION_SECRET` | valor de desarrollo (cámbialo en producción) |
 | `DB_PATH` | `data/pedidos.sqlite` (no se versiona) |
-| `TWILIO_ACCOUNT_SID` | Account SID de Twilio (WhatsApp) |
-| `TWILIO_AUTH_TOKEN` | Auth Token de Twilio |
-| `TWILIO_WHATSAPP_FROM` | Remitente, p. ej. `whatsapp:+14155238886` (Sandbox o sender aprobado) |
+| `SMTP_HOST` | Host SMTP (avisos de pedido) |
+| `SMTP_PORT` | `587` (o `465`) |
+| `SMTP_USER` | Usuario SMTP (opcional si el relay no autentica) |
+| `SMTP_PASS` | Contraseña SMTP |
+| `MAIL_FROM` | Remitente, p. ej. `Hunters 547 <noreply@example.com>` |
+| `SMTP_SECURE` | Opcional: `true`/`false` (por defecto `true` si el puerto es 465) |
+| `PUBLIC_BASE_URL` | Opcional: URL pública sin slash final para el enlace de rastreo |
 
-Si falta **alguna** de las tres `TWILIO_*`, **no se envía** nada: solo se escribe en consola (`[whatsapp] (log only — falta TWILIO_*)`). El demo local corre sin cuenta Twilio. Un enlace `wa.me` no puede empujar mensajes desde el servidor.
-
-Al crear un portal, el superadmin captura **WhatsApp para actualizaciones** (`portals.whatsapp_number`). Si está definido, el servicio lo usa como remitente (FROM) preferido frente a `TWILIO_WHATSAPP_FROM`.
+Si faltan **`SMTP_HOST`**, **`SMTP_PORT`** o **`MAIL_FROM`**, **no se envía** nada: solo se escribe en consola (`[mailer] (log only — falta SMTP_* / MAIL_FROM)`). El demo local corre sin SMTP.
 
 ```bash
-export TWILIO_ACCOUNT_SID=ACxxxxxxxx
-export TWILIO_AUTH_TOKEN=xxxxxxxx
-export TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
+export SMTP_HOST=smtp.example.com
+export SMTP_PORT=587
+export SMTP_USER=noreply@example.com
+export SMTP_PASS=cambia-esto
+export MAIL_FROM="Hunters 547 <noreply@example.com>"
+export PUBLIC_BASE_URL=https://pedidos.example.com
 npm start
 ```
 
-**No subas tokens.** Implementación: `src/services/whatsapp.js` (REST Twilio, sin SDK). Hooks: `POST /encargado/orders`, avance/cancelación del encargado, `POST /api/status` (Entregado por chofer). Mensajes en español con número de pedido y estado.
+**No subas contraseñas.** Implementación: `src/services/mailer.js` + `src/services/emailTemplates.js`. Hooks: `POST /encargado/orders`, avance/cancelación del encargado, `POST /api/status` (Entregado por chofer).
 
 ```bash
 npm test
@@ -52,9 +74,9 @@ npm run seed
 
 | Rol | Usuario | Contraseña | Qué puede hacer |
 |-----|---------|------------|-----------------|
-| **superadmin** | `superadmin` | `superadmin123` | Agencia: crea portales, logo, credenciales de encargado; dashboard global |
-| **encargado** | `encargado` | `encargado123` | Portal *Hunters 547 Demo*: dashboard + métricas, **número de pedido manual**, altas clientes/choferes, avanza hasta **En camino** |
-| **chofer** | `chofer` | `chofer123` | Pedidos asignados de **su** portal; GPS en **En camino**; marcar **Entregado** |
+| **superadmin** | `superadmin` | `superadmin123` | Agencia: crea portales, logo, dirección, credenciales de encargado; dashboard global |
+| **encargado** | `encargado` | `encargado123` | Portal *Hunters 547 Demo*: dashboard + métricas, **número de pedido manual**, altas clientes/choferes, **remisión provisional**, avanza hasta **En camino** |
+| **chofer** | `chofer` | `chofer123` | Pedidos asignados de **su** portal; GPS en **En camino**; marcar **Entregado** (foto + firma) |
 | **cliente** | `cliente` | `cliente123` | Solo pedidos de su `cliente_id` **dentro de su portal** |
 | cliente (otro) | `cliente2` | `cliente123` | Pedidos del *otro* customer del mismo portal (aislamiento) |
 | encargado (otro portal) | `encnorte` | `norte123` | Portal *Logística Norte* — no ve datos del portal demo |
@@ -77,7 +99,9 @@ Cada **portal** (empresa cliente de la agencia) es un tenant:
 | `slug` | Identificador único |
 | `logo_path` | `/uploads/portals/{id}/logo.*` (si no hay, logo H547) |
 | `contact_name`, `phone`, `email`, `notes` | Datos de contacto |
-| `whatsapp_number` | WhatsApp del portal para actualizaciones (FROM preferido) |
+| `address` | Dirección impresa en remisiones (si vacío, se usan notas) |
+| `remision_next` | Siguiente folio de remisión provisional |
+| `whatsapp_number` | Reservado; los avisos de estado van por email |
 | `active` | Si está inactivo, sus usuarios no pueden iniciar sesión |
 | `created_at` | Alta |
 
@@ -85,8 +109,8 @@ Cada **portal** (empresa cliente de la agencia) es un tenant:
 
 ### Flujo de alta
 
-1. Superadmin crea portal + usuario/contraseña del **encargado** + logo opcional + WhatsApp de actualizaciones.
-2. Ese encargado entra a `/encargado` (**sidebar**: Dashboard, Nuevo pedido, Altas clientes/choferes, Rastreo). Asigna el **número de pedido a mano** (único por portal); gestiona choferes y clientes **solo de su portal**.
+1. Superadmin crea portal + usuario/contraseña del **encargado** + logo opcional + dirección de empresa.
+2. Ese encargado entra a `/encargado` (**sidebar**: Dashboard, Nuevo pedido, Altas clientes/choferes, Remisión provisional, Rastreo). Asigna el **número de pedido a mano** (único por portal); gestiona choferes y clientes **solo de su portal**; emite remisiones provisionales con folio por portal.
 3. Los `cliente` finales solo ven sus propios pedidos dentro de ese portal.
 4. GPS / mapa / estados siguen igual, filtrados por `portal_id`.
 
@@ -95,6 +119,7 @@ Cada **portal** (empresa cliente de la agencia) es un tenant:
 - Encargado / chofer / cliente **nunca** ven filas de otro `portal_id`.
 - Las APIs (`/api/location`, `/api/status`, `/api/cliente/*`) comprueban `portal_id` de la sesión.
 - Superadmin ve métricas y puede editar **todos** los portales.
+- Las remisiones también se filtran por `portal_id` (folio consecutivo independiente por portal).
 
 Demo: inicia sesión como `encargado` — no aparece el pedido `H547-NTE01-…` de Logística Norte. Como `encnorte` no ves los `H547-DEMO…`.
 
@@ -108,16 +133,18 @@ Demo: inicia sesión como `encargado` — no aparece el pedido `H547-NTE01-…` 
 ## Panel encargado (UX)
 
 - **Número de pedido** (`tracking_code`): lo captura el encargado al crear el pedido (campo obligatorio). La app puede sugerir un código, pero no lo genera sola como único camino. Unicidad validada por `portal_id`.
-- **Nuevo pedido**: al elegir un **cliente de alta**, se autofillan contacto, teléfono, dirección y notas.
+- **Nuevo pedido**: al elegir un **cliente de alta**, se autofillan contacto, **email**, teléfono, dirección y notas. Incluye **Nº Orden de Compra** y líneas de **Material enviado**.
+- **Remisión provisional**: menú → listado + nueva. Captura cliente, cantidad, unidad, descripción, lote e importes; folio consecutivo y fecha; documento con logo / nombre / dirección de la empresa.
 - **Dashboard** (`/encargado`): lista de pedidos y KPIs filtrables por presets **día / semana / mes / año** o rango manual.
-- **Altas** (`/encargado/clientes`, `/encargado/choferes`): buscar, editar, **Activo / Bloqueado**.
-- **Menú lateral** colapsable (hamburguesa): Dashboard, Rastreo, Nuevo pedido, Altas clientes, Altas choferes. En móvil abre como drawer. Chofer/cliente también tienen sidebar simple.
+- **Altas** (`/encargado/clientes`, `/encargado/choferes`): buscar, editar, **Activo / Bloqueado**. Email opcional en clientes (avisos de estado).
+- **Menú lateral** colapsable (hamburguesa): Dashboard, Rastreo, Nuevo pedido, Altas clientes, Altas choferes, Remisión provisional. En móvil abre como drawer. Chofer/cliente también tienen sidebar simple.
 
 ## Stack
 
-- Node.js 18+ + **Express**
-- **better-sqlite3** (demo local). **Supabase** (Postgres) previsto para producción.
-- **express-session** (cookie) + **bcryptjs** + **multer** (logo)
+- Node.js 20+ + **Express**
+- **better-sqlite3** (demo local)
+- **nodemailer** (SMTP; log-only si faltan credenciales)
+- **express-session** (cookie) + **bcryptjs** + **multer** (logo + foto de entrega)
 - Vistas **EJS** + estáticos en `public/`
 - Leaflet 1.9 (CDN) · Chart.js 4 (CDN, dashboard)
 
@@ -127,21 +154,25 @@ Demo: inicia sesión como `encargado` — no aparece el pedido `H547-NTE01-…` 
 |------|-------------|
 | `/login` | Login |
 | `/superadmin` | Dashboard agencia (KPIs + charts) |
-| `/superadmin/portals` | Alta / edición de portales, credenciales, logo, WhatsApp |
+| `/superadmin/portals` | Alta / edición de portales, credenciales, logo, dirección |
 | `/encargado` | Dashboard encargado: pedidos + métricas + filtro de fechas |
-| `/encargado/nuevo` | Alta de pedido (número de pedido **manual** / único por portal; autofill de cliente) |
-| `/encargado/clientes` | Altas de clientes: editar, bloquear, buscar (+ login opcional) |
+| `/encargado/nuevo` | Alta de pedido (número de pedido **manual** / único por portal; autofill + OC + materiales) |
+| `/encargado/pedido/:id` | Detalle de pedido |
+| `/encargado/remisiones` | Listado de remisiones provisionales del portal |
+| `/encargado/remisiones/nueva` | Nueva remisión (cliente, líneas, folio+fecha) |
+| `/encargado/remisiones/:id` | Consulta / impresión de remisión |
+| `/encargado/clientes` | Altas de clientes: email, editar, bloquear, buscar (+ login opcional) |
 | `/encargado/choferes` | Altas de choferes: editar, bloquear, buscar |
-| `/chofer` | Entregas + GPS |
+| `/chofer` | Entregas + GPS (foto + firma al marcar Entregado) |
 | `/cliente` | Mis pedidos (filtrados) |
 | `/rastreo?codigo=…` | Rastreo público + mapa |
 
 ### Flujo de demostración
 
-1. Login **superadmin** → dashboard con métricas cruzadas → **Nuevo portal** (logo + usuario encargado + WhatsApp).
-2. Logout → login con ese encargado → Dashboard con filtros de fecha; **Nuevo pedido** (elige cliente de alta → autofill); Altas clientes / choferes (editar / bloquear / buscar). Menú lateral colapsable.
+1. Login **superadmin** → dashboard con métricas cruzadas → **Nuevo portal** (logo + dirección + usuario encargado).
+2. Logout → login con ese encargado → Dashboard con filtros de fecha; **Nuevo pedido** (elige cliente de alta → autofill email/teléfono; OC + materiales); **Remisión provisional** (folio automático, líneas, imprimir); Altas clientes / choferes.
 3. Login **encargado** (demo) → avanza un pedido hasta **En camino**.
-4. Logout → login **chofer** → **Compartir ubicación en vivo** → **Marcar Entregado**.
+4. Logout → login **chofer** → **Compartir ubicación en vivo** → **Marcar Entregado** (foto + firma obligatorias).
 5. Otra pestaña: `/rastreo?codigo=H547-DEMO01-…` ve el mapa (polling cada 5 s).
 6. Login **cliente** → solo sus pedidos; intenta `/cliente/pedido/<id-de-otro>` → 404.
 
@@ -152,54 +183,57 @@ Demo: inicia sesión como `encargado` — no aparece el pedido `H547-NTE01-…` 
 ```
 .
 ├── server.js
+├── db.js                      # cliente Supabase opcional (no usado por el demo SQLite)
 ├── package.json
 ├── README.md
 ├── data/                      # SQLite (no versionar .sqlite)
 ├── src/
 │   ├── constants.js
-│   ├── db.js                  # schema + portal_id + whatsapp_number
+│   ├── db.js                  # schema SQLite + remisiones + customers.email
 │   ├── portal.js              # slugs, logos, métricas, resolveDateRange
 │   ├── seed.js
 │   ├── middleware.js
 │   ├── services/
-│   │   └── whatsapp.js        # Twilio WhatsApp (FROM de portal o env)
+│   │   ├── mailer.js          # SMTP nodemailer (o log-only sin creds)
+│   │   ├── emailTemplates.js  # HTML + texto es-MX
+│   │   └── whatsapp.js        # legado; ya no se usa para avisos de estado
 │   └── routes/                # auth, superadmin, encargado, chofer, cliente, rastreo, api
 ├── test/                      # node:test
-├── views/                     # EJS (incluye partials/sidebar.ejs)
+├── views/                     # EJS
 └── public/
     ├── assets/                # css, js, img (logo H547)
-    └── uploads/portals/{id}/  # logos de tenant (no versionar archivos)
+    └── uploads/
+        ├── portals/{id}/           # logos de tenant
+        └── deliveries/{orderId}/   # foto + firma de entrega
 ```
 
 ## Modelo de datos (resumen)
 
-- **portals** — tenants: `name`, `slug`, `logo_path`, contacto, `whatsapp_number`, `active`
+- **portals** — tenants: `name`, `slug`, `logo_path`, contacto, `address`, `remision_next`, `active`
 - **users** — `username`, `password_hash`, `role` (`superadmin|encargado|chofer|cliente`), `name`, `cliente_id`, `portal_id` (null en superadmin), `active`
-- **customers** — `name`, `phone`, `address`, `notes`, `active` (Activo/Bloqueado), `portal_id`
-- **orders** — `tracking_code` (asignado por el encargado; único por `portal_id`), `customer_id`, `phone` (avisos WhatsApp), entrega, `status`, `chofer_id`, `portal_id`
+- **customers** — `name`, `phone`, `email` (opcional, avisos), `address`, `notes`, `active` (Activo/Bloqueado), `portal_id`
+- **orders** — `tracking_code` (asignado por el encargado; único por `portal_id`), `customer_id`, entrega, `status`, `chofer_id`, `portal_id`, `purchase_order`, `delivery_photo_path`, `delivery_signature_path`
+- **order_items** — líneas de material (`order_id`, `description`, `uom`, `quantity`)
+- **remisiones** — folio por portal, fecha, cliente, snapshot de empresa (nombre/dirección/logo), totales
+- **remision_items** — líneas (`cantidad`, `unidad`, `descripcion`, `lote`, `importe`)
 - **location_updates** — GPS
 - **status_history** — historial de estados
 
 ### Reglas de API GPS / estado
 
 - `POST /api/location`: solo **chofer**; pedido **asignado a él**, mismo `portal_id` y status **`en_camino`**; si no → 403.
-- `POST /api/status` (entregado): mismo criterio.
+- `POST /api/status` (entregado): mismo criterio; **multipart** con `photo` (archivo) + `signature` (data URL PNG). Sin ambos → 400.
 - `GET /api/cliente/*`: `customer_id` + `portal_id` de sesión.
 
-## WhatsApp (notificaciones de pedido)
+## Email (notificaciones de pedido)
 
-Al **crear** un pedido y en **cada cambio de estado** hasta **Entregado** (incluido), la app notifica al teléfono registrado del cliente (`orders.phone`) vía Twilio WhatsApp. Mensajes en **español**, con marca del portal (si aplica), número de pedido (`tracking_code`) y estado legible. Cancelado también avisa.
+Al **crear** un pedido y en **cada cambio de estado** hasta **Entregado** (incluido) y en **cancelación**, la app envía un correo al **email registrado del cliente** (`customers.email`, o el capturado en Nuevo pedido).
 
-Si falta alguna de `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_WHATSAPP_FROM`, **no se envía** nada: solo se escribe en consola. Implementación: `src/services/whatsapp.js` (REST Twilio, sin SDK). Hooks: `POST /encargado/orders`, avance/cancelación del encargado, `POST /api/status` (Entregado por chofer).
+Si el cliente **solo tiene teléfono** (sin email), **no se envía** nada: se registra en consola (`[mailer] Sin email del cliente; se omite notificación.`). El campo teléfono se conserva; WhatsApp **ya no** se usa para avisos de estado.
 
-## SQLite (demo) → Supabase (producción)
+Plantilla **es-MX** (HTML + texto): nombre del portal/empresa, número de pedido / rastreo, OC si existe, resumen de materiales, estado anterior → nuevo (o “registrado”), fechas, enlace a `/rastreo?codigo=…` si `PUBLIC_BASE_URL` está definido, y pie pidiendo agregar el remitente (`MAIL_FROM`) a contactos.
 
-Este prototipo usa **SQLite** (`better-sqlite3`) para correr en un solo comando. El esquema lógico (portales, usuarios, pedidos, GPS) es el mismo que se mapearía a **Supabase**:
-
-1. Tablas equivalentes en Postgres (RLS por `portal_id` / rol).
-2. Sustituir `src/db.js` por el cliente Supabase (o `pg`) manteniendo las mismas consultas de negocio.
-3. Variables: `SUPABASE_URL`, `SUPABASE_ANON_KEY` / service role en servidor; `SESSION_SECRET` fuerte; cookie `secure: true` detrás de HTTPS.
-4. Geolocation del navegador **exige HTTPS** fuera de localhost.
+> **WhatsApp discontinuado** para notificaciones de estado. `src/services/whatsapp.js` y `portals.whatsapp_number` pueden permanecer sin uso activo.
 
 ## Licencia
 

@@ -1,7 +1,7 @@
 'use strict';
 
 const express = require('express');
-const { getDb } = require('../db');
+const { getDb, loadOrderItems } = require('../db');
 const { getPortal, branding } = require('../portal');
 
 const router = express.Router();
@@ -38,10 +38,13 @@ router.get('/', (req, res) => {
     }
   }
 
+  const items = order ? loadOrderItems(order.id) : [];
+
   res.render('rastreo', {
     title: 'Rastrear pedido',
     codigo,
     order,
+    items,
     history,
     lastLoc,
   });

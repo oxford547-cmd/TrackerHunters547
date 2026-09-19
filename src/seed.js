@@ -6,13 +6,17 @@ const bcrypt = require('bcryptjs');
 const { getDb, ensureSchema, now, DB_PATH } = require('./db');
 const { daysAgoTs } = require('./portal');
 
-function wipePortalUploads() {
-  const root = path.join(__dirname, '..', 'public', 'uploads', 'portals');
+function wipeUploadDir(rel) {
+  const root = path.join(__dirname, '..', 'public', 'uploads', rel);
   fs.mkdirSync(root, { recursive: true });
   for (const name of fs.readdirSync(root)) {
     if (name === '.gitkeep') continue;
     fs.rmSync(path.join(root, name), { recursive: true, force: true });
   }
+}
+
+function wipePortalUploads() {
+  wipeUploadDir('portals');
 }
 
 function seed(force = false) {
@@ -29,14 +33,18 @@ function seed(force = false) {
   const tx = d.transaction(() => {
     if (force) {
       d.exec(`
+        DELETE FROM remision_items;
+        DELETE FROM remisiones;
         DELETE FROM location_updates;
         DELETE FROM status_history;
+        DELETE FROM order_items;
         DELETE FROM orders;
         DELETE FROM users;
         DELETE FROM customers;
         DELETE FROM portals;
       `);
       wipePortalUploads();
+      wipeUploadDir('deliveries');
     }
 
     const ts = now();
@@ -47,8 +55,8 @@ function seed(force = false) {
     const hashNorte = bcrypt.hashSync('norte123', 10);
 
     const insPortal = d.prepare(
-      `INSERT INTO portals (name, slug, logo_path, contact_name, phone, email, notes, active, created_at, whatsapp_number)
-       VALUES (?,?,?,?,?,?,?,?,?,?)`
+      `INSERT INTO portals (name, slug, logo_path, contact_name, phone, email, notes, active, created_at, whatsapp_number, address)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`
     );
     const portal1 = insPortal.run(
       'Hunters 547 Demo',
@@ -60,7 +68,8 @@ function seed(force = false) {
       'Portal demo por defecto. Conserva los usuarios históricos.',
       1,
       ts,
-      '5511112233'
+      '5511112233',
+      'Av. Insurgentes Sur 1457, Col. Insurgentes Mixcoac, CDMX'
     ).lastInsertRowid;
     const portal2 = insPortal.run(
       'Logística Norte',
@@ -72,15 +81,17 @@ function seed(force = false) {
       'Segundo portal para demostrar aislamiento multi-tenant.',
       1,
       ts,
-      '8180001111'
+      '8180001111',
+      'Av. Constitución 800, Monterrey, NL'
     ).lastInsertRowid;
 
     const insCust = d.prepare(
-      'INSERT INTO customers (name, phone, address, notes, active, created_at, portal_id) VALUES (?,?,?,?,?,?,?)'
+      'INSERT INTO customers (name, phone, email, address, notes, active, created_at, portal_id) VALUES (?,?,?,?,?,?,?,?)'
     );
     const cust1 = insCust.run(
       'Cliente Demo García',
       '5512345678',
+      'demo.garcia@example.com',
       'Av. Reforma 100, Col. Centro, CDMX',
       'Entregar en recepción',
       1,
@@ -90,6 +101,7 @@ function seed(force = false) {
     const cust2 = insCust.run(
       'Otro Cliente Pérez',
       '5587654321',
+      'otro.perez@example.com',
       'Insurgentes Sur 200, CDMX',
       '',
       1,
@@ -99,6 +111,7 @@ function seed(force = false) {
     const custN = insCust.run(
       'Cliente Norte López',
       '8185550101',
+      'norte.lopez@example.com',
       'Av. Constitución 50, Monterrey, NL',
       'Horario 9–18 h',
       1,
@@ -344,6 +357,35 @@ function seed(force = false) {
     hist.run(oN3, 'entregado', choN, 'Entregado', ts4);
     hist.run(oN4, 'pedido_colocado', encN, 'Creado', ts6);
     hist.run(oN4, 'cancelado', encN, 'Cancelado', ts6);
+
+    const remFecha = new Date().toISOString().slice(0, 10);
+    const remInfo = d
+      .prepare(
+        `INSERT INTO remisiones
+          (portal_id, folio, fecha, customer_name, company_name, company_address, company_logo_path,
+           total_importe, total_cantidad, created_by, created_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+      )
+      .run(
+        portal1,
+        1,
+        remFecha,
+        'Cliente Demo García',
+        'Hunters 547 Demo',
+        'Av. Insurgentes Sur 1457, Col. Insurgentes Mixcoac, CDMX',
+        null,
+        1850,
+        62,
+        encId,
+        ts
+      );
+    const insRemItem = d.prepare(
+      `INSERT INTO remision_items (remision_id, cantidad, unidad, descripcion, lote, importe)
+       VALUES (?,?,?,?,?,?)`
+    );
+    insRemItem.run(remInfo.lastInsertRowid, 12, 'PZ', 'Varilla 3/8', 'L-2401', 960);
+    insRemItem.run(remInfo.lastInsertRowid, 50, 'KG', 'Cemento gris', 'L-CEM09', 890);
+    d.prepare('UPDATE portals SET remision_next = 2 WHERE id = ?').run(portal1);
 
     return { code1, code2, codeOther, codeLive, codeDone, codeN1, portal1, portal2 };
   });

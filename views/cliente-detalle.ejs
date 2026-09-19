@@ -10,7 +10,12 @@
     <%= order.phone %><br>
     <%= order.address %>
   </p>
+  <% if (order.purchase_order) { %>
+    <p><strong>Nº Orden de Compra:</strong> <%= order.purchase_order %></p>
+  <% } %>
   <% if (order.notes) { %><p class="muted"><%= order.notes %></p><% } %>
+  <%- include('partials/order-materials', { items: typeof items !== 'undefined' ? items : [] }) %>
+  <%- include('partials/order-delivery-proof', { order }) %>
 </div>
 
 <% if (order.status === 'en_camino') { %>

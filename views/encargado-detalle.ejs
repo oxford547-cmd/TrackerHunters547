@@ -1,0 +1,40 @@
+<%- include('partials/head', { withSidebar: true }) %>
+<div class="dash-head">
+  <div>
+    <p><a href="/encargado">← Dashboard</a></p>
+    <h1 class="dash-title lime"><code><%= order.tracking_code %></code></h1>
+    <p><span class="badge <%= badgeClass(order.status) %>"><%= statusLabel(order.status) %></span></p>
+  </div>
+  <div class="dash-actions">
+    <a class="btn btn-glass" href="/rastreo?codigo=<%= encodeURIComponent(order.tracking_code) %>" target="_blank">Rastreo</a>
+  </div>
+</div>
+
+<div class="card mb">
+  <p><strong><%= order.customer_name %></strong><br>
+    <%= order.phone %><br>
+    <%= order.address %>
+  </p>
+  <% if (order.purchase_order) { %>
+    <p><strong>Nº Orden de Compra:</strong> <%= order.purchase_order %></p>
+  <% } %>
+  <% if (order.notes) { %><p class="muted"><%= order.notes %></p><% } %>
+  <% if (chofer) { %><p class="muted small">Chofer: <%= chofer.name %></p><% } %>
+  <%- include('partials/order-materials', { items }) %>
+  <%- include('partials/order-delivery-proof', { order }) %>
+</div>
+
+<div class="card">
+  <h2>Historial</h2>
+  <ol class="timeline">
+    <% history.forEach(h => { %>
+      <li>
+        <span class="badge <%= badgeClass(h.status) %>"><%= statusLabel(h.status) %></span>
+        <span class="muted small"><%= h.created_at %></span>
+        <% if (h.changed_by_name) { %><span class="muted small">· <%= h.changed_by_name %></span><% } %>
+        <% if (h.notes) { %><span class="muted small">· <%= h.notes %></span><% } %>
+      </li>
+    <% }) %>
+  </ol>
+</div>
+<%- include('partials/foot') %>

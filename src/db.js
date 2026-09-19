@@ -72,6 +72,9 @@ function migrateTrackingUniqueness(d) {
         updated_at TEXT NOT NULL,
         delivered_at TEXT NULL,
         portal_id INTEGER,
+        purchase_order TEXT NOT NULL DEFAULT '',
+        delivery_photo_path TEXT NULL,
+        delivery_signature_path TEXT NULL,
         FOREIGN KEY (customer_id) REFERENCES customers(id),
         FOREIGN KEY (chofer_id) REFERENCES users(id),
         FOREIGN KEY (created_by) REFERENCES users(id)
@@ -115,6 +118,7 @@ function ensureSchema() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       phone TEXT NOT NULL DEFAULT '',
+      email TEXT NOT NULL DEFAULT '',
       address TEXT NOT NULL DEFAULT '',
       notes TEXT NOT NULL DEFAULT '',
       active INTEGER NOT NULL DEFAULT 1,
@@ -178,9 +182,57 @@ function ensureSchema() {
   addColumnIfMissing(d, 'customers', 'portal_id', 'INTEGER');
   addColumnIfMissing(d, 'customers', 'notes', "TEXT NOT NULL DEFAULT ''");
   addColumnIfMissing(d, 'customers', 'active', 'INTEGER NOT NULL DEFAULT 1');
+  addColumnIfMissing(d, 'customers', 'email', "TEXT NOT NULL DEFAULT ''");
   addColumnIfMissing(d, 'portals', 'whatsapp_number', "TEXT NOT NULL DEFAULT ''");
+  addColumnIfMissing(d, 'orders', 'purchase_order', "TEXT NOT NULL DEFAULT ''");
+  addColumnIfMissing(d, 'orders', 'delivery_photo_path', 'TEXT NULL');
+  addColumnIfMissing(d, 'orders', 'delivery_signature_path', 'TEXT NULL');
+  addColumnIfMissing(d, 'portals', 'address', "TEXT NOT NULL DEFAULT ''");
+  addColumnIfMissing(d, 'portals', 'remision_next', 'INTEGER NOT NULL DEFAULT 1');
 
   d.exec(`
+    CREATE TABLE IF NOT EXISTS remisiones (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      portal_id INTEGER NOT NULL,
+      folio INTEGER NOT NULL,
+      fecha TEXT NOT NULL,
+      customer_name TEXT NOT NULL DEFAULT '',
+      company_name TEXT NOT NULL DEFAULT '',
+      company_address TEXT NOT NULL DEFAULT '',
+      company_logo_path TEXT NULL,
+      total_importe REAL NULL,
+      total_cantidad REAL NOT NULL DEFAULT 0,
+      created_by INTEGER NULL,
+      created_at TEXT NOT NULL,
+      UNIQUE(portal_id, folio),
+      FOREIGN KEY (portal_id) REFERENCES portals(id),
+      FOREIGN KEY (created_by) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_remisiones_portal ON remisiones(portal_id);
+    CREATE INDEX IF NOT EXISTS idx_remisiones_fecha ON remisiones(fecha);
+
+    CREATE TABLE IF NOT EXISTS remision_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      remision_id INTEGER NOT NULL,
+      cantidad REAL NOT NULL DEFAULT 0,
+      unidad TEXT NOT NULL DEFAULT '',
+      descripcion TEXT NOT NULL DEFAULT '',
+      lote TEXT NOT NULL DEFAULT '',
+      importe REAL NULL,
+      FOREIGN KEY (remision_id) REFERENCES remisiones(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_remision_items_remision ON remision_items(remision_id);
+
+    CREATE TABLE IF NOT EXISTS order_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id INTEGER NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      uom TEXT NOT NULL DEFAULT '',
+      quantity REAL NOT NULL DEFAULT 0,
+      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+
     CREATE INDEX IF NOT EXISTS idx_users_portal ON users(portal_id);
     CREATE INDEX IF NOT EXISTS idx_orders_portal ON orders(portal_id);
     CREATE INDEX IF NOT EXISTS idx_customers_portal ON customers(portal_id);
@@ -192,6 +244,153 @@ function ensureSchema() {
 
   const uploadDir = path.join(__dirname, '..', 'public', 'uploads', 'portals');
   fs.mkdirSync(uploadDir, { recursive: true });
+  const deliveryDir = path.join(__dirname, '..', 'public', 'uploads', 'deliveries');
+  fs.mkdirSync(deliveryDir, { recursive: true });
 }
 
-module.exports = { getDb, now, generateTrackingCode, ensureSchema, DB_PATH };
+function loadOrderItems(orderId) {
+  return getDb()
+    .prepare(
+      'SELECT id, order_id, description, uom, quantity FROM order_items WHERE order_id = ? ORDER BY id ASC'
+    )
+    .all(orderId);
+}
+
+/** Parse material lines from form body (arrays or single values). */
+function parseOrderItemsFromBody(body) {
+  const descriptions = [].concat(body.item_description || body['item_description[]'] || []);
+  const uoms = [].concat(body.item_uom || body['item_uom[]'] || []);
+  const qtys = [].concat(body.item_quantity || body['item_quantity[]'] || []);
+  const items = [];
+  const n = Math.max(descriptions.length, uoms.length, qtys.length);
+  for (let i = 0; i < n; i++) {
+    const description = String(descriptions[i] || '').trim();
+    const uom = String(uoms[i] || '').trim();
+    const qtyRaw = qtys[i];
+    const quantity = qtyRaw === '' || qtyRaw == null ? NaN : Number(qtyRaw);
+    if (!description && !uom && (qtyRaw === '' || qtyRaw == null)) continue;
+    if (!description) continue;
+    items.push({
+      description,
+      uom: uom || 'PZ',
+      quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+    });
+  }
+  return items;
+}
+
+function insertOrderItems(orderId, items) {
+  if (!items || !items.length) return;
+  const stmt = getDb().prepare(
+    'INSERT INTO order_items (order_id, description, uom, quantity) VALUES (?,?,?,?)'
+  );
+  const tx = getDb().transaction((rows) => {
+    for (const it of rows) {
+      stmt.run(orderId, it.description, it.uom, it.quantity);
+    }
+  });
+  tx(items);
+}
+
+
+function loadRemisionItems(remisionId) {
+  return getDb()
+    .prepare(
+      `SELECT id, remision_id, cantidad, unidad, descripcion, lote, importe
+       FROM remision_items WHERE remision_id = ? ORDER BY id ASC`
+    )
+    .all(remisionId);
+}
+
+/** Parse remisión lines from form body. */
+function parseRemisionItemsFromBody(body) {
+  const cantidades = [].concat(body.item_cantidad || body['item_cantidad[]'] || []);
+  const unidades = [].concat(body.item_unidad || body['item_unidad[]'] || []);
+  const descripciones = [].concat(body.item_descripcion || body['item_descripcion[]'] || []);
+  const lotes = [].concat(body.item_lote || body['item_lote[]'] || []);
+  const importes = [].concat(body.item_importe || body['item_importe[]'] || []);
+  const items = [];
+  const n = Math.max(
+    cantidades.length,
+    unidades.length,
+    descripciones.length,
+    lotes.length,
+    importes.length
+  );
+  for (let i = 0; i < n; i++) {
+    const descripcion = String(descripciones[i] || '').trim();
+    const unidad = String(unidades[i] || '').trim();
+    const lote = String(lotes[i] || '').trim();
+    const qtyRaw = cantidades[i];
+    const impRaw = importes[i];
+    const cantidad = qtyRaw === '' || qtyRaw == null ? NaN : Number(qtyRaw);
+    let importe = null;
+    if (impRaw !== '' && impRaw != null) {
+      const nImp = Number(impRaw);
+      if (Number.isFinite(nImp)) importe = nImp;
+    }
+    if (!descripcion && !unidad && !lote && (qtyRaw === '' || qtyRaw == null) && importe == null) {
+      continue;
+    }
+    if (!descripcion) continue;
+    items.push({
+      cantidad: Number.isFinite(cantidad) && cantidad > 0 ? cantidad : 1,
+      unidad: unidad || 'PZ',
+      descripcion,
+      lote,
+      importe,
+    });
+  }
+  return items;
+}
+
+function insertRemisionItems(remisionId, items) {
+  if (!items || !items.length) return;
+  const stmt = getDb().prepare(
+    `INSERT INTO remision_items (remision_id, cantidad, unidad, descripcion, lote, importe)
+     VALUES (?,?,?,?,?,?)`
+  );
+  const tx = getDb().transaction((rows) => {
+    for (const it of rows) {
+      stmt.run(remisionId, it.cantidad, it.unidad, it.descripcion, it.lote, it.importe);
+    }
+  });
+  tx(items);
+}
+
+/**
+ * Allocate next folio for portal (atomic). Uses portals.remision_next when present,
+ * otherwise max(folio)+1, and keeps remision_next in sync.
+ */
+function nextRemisionFolio(portalId) {
+  const d = getDb();
+  const pid = Number(portalId);
+  const allocate = d.transaction(() => {
+    const portal = d.prepare('SELECT id, remision_next FROM portals WHERE id = ?').get(pid);
+    if (!portal) throw new Error('Portal no encontrado');
+    const maxRow = d
+      .prepare('SELECT COALESCE(MAX(folio), 0) AS m FROM remisiones WHERE portal_id = ?')
+      .get(pid);
+    const fromMax = Number(maxRow.m) + 1;
+    const fromCounter = Number(portal.remision_next) || 1;
+    const folio = Math.max(fromMax, fromCounter);
+    d.prepare('UPDATE portals SET remision_next = ? WHERE id = ?').run(folio + 1, pid);
+    return folio;
+  });
+  return allocate();
+}
+
+module.exports = {
+  getDb,
+  now,
+  generateTrackingCode,
+  ensureSchema,
+  DB_PATH,
+  loadOrderItems,
+  parseOrderItemsFromBody,
+  insertOrderItems,
+  loadRemisionItems,
+  parseRemisionItemsFromBody,
+  insertRemisionItems,
+  nextRemisionFolio,
+};
