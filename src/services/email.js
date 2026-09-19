@@ -2,7 +2,7 @@
 
 const { ORDER_STATUSES } = require('../constants');
 const { findPortalById, listOrderItems } = require('../db');
-
+const { resolveEmailLogo, EMAIL_LOGO_CID } = require('../uploads');
 const FROM_DISPLAY_NAME = 'Notificaciones';
 const HUNTERS_SITE_URL = 'https://www.hunters547.com';
 const HUNTERS_SITE_LABEL = 'www.hunters547.com';
@@ -56,14 +56,8 @@ function firstEmail(...candidates) {
 }
 
 function portalLogoSrc(portal) {
-  if (!portal) return '';
-  const raw = String(portal.logo_path || '').trim();
-  if (!raw) return '';
-  if (/^https?:\/\//i.test(raw)) return raw;
-  const base = publicBaseUrl();
-  if (!base) return '';
-  const path = raw.startsWith('/') ? raw : `/${raw}`;
-  return `${base}${path}`;
+  const resolved = resolveEmailLogo(portal);
+  return resolved.src;
 }
 
 function trackingUrl(code) {
@@ -281,18 +275,20 @@ function buildOrderMessage(order, portal) {
   const brand = (portal && portal.name) || 'Hunters 547';
   const code = safeOrder.tracking_code || '—';
   const fromRaw = smtpFrom();
+  const logo = resolveEmailLogo(portal);
   const extras = {
     subject: subjectFor(safeOrder.status, brand, code),
     items: normalizeItems(safeOrder),
     rows: detailRows(safeOrder, portal),
     trackUrl: trackingUrl(code),
-    logoSrc: portalLogoSrc(portal),
+    logoSrc: logo.src,
     spam: spamNote(fromRaw),
   };
   return {
     subject: extras.subject,
     text: buildOrderText(safeOrder, portal, extras),
     html: buildOrderHtml(safeOrder, portal, extras),
+    attachments: logo.attachment ? [logo.attachment] : [],
   };
 }
 
@@ -318,7 +314,7 @@ async function attachItemsIfNeeded(order) {
   }
 }
 
-async function sendMail({ to, subject, text, html }) {
+async function sendMail({ to, subject, text, html, attachments }) {
   if (!to) {
     console.warn('[email] Sin destinatario; no se notifica.', { subject, text });
     return { ok: false, error: 'invalid_email' };
@@ -360,6 +356,7 @@ async function sendMail({ to, subject, text, html }) {
     text,
   };
   if (html) payload.html = html;
+  if (attachments && attachments.length) payload.attachments = attachments;
 
   try {
     const info = await transporter.sendMail(payload);
@@ -383,7 +380,13 @@ async function notifyOrderStatus(order) {
     return { ok: false, error: 'invalid_email' };
   }
   const msg = buildOrderMessage(enriched, portal);
-  return sendMail({ to, subject: msg.subject, text: msg.text, html: msg.html });
+  return sendMail({
+    to,
+    subject: msg.subject,
+    text: msg.text,
+    html: msg.html,
+    attachments: msg.attachments,
+  });
 }
 
 function notifyOrderStatusAsync(order) {
@@ -404,6 +407,7 @@ module.exports = {
   formatFromHeader,
   escapeHtml,
   portalLogoSrc,
+  EMAIL_LOGO_CID,
   buildOrderMessage,
   sendMail,
   notifyOrderStatus,

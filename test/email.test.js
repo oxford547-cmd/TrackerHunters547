@@ -21,7 +21,9 @@ const {
   portalLogoSrc,
   FROM_DISPLAY_NAME,
   HUNTERS_SITE_URL,
+  EMAIL_LOGO_CID,
 } = require('../src/services/email');
+const { defaultLogoFile } = require('../src/uploads');
 
 beforeEach(() => {
   delete process.env.SMTP_HOST;
@@ -31,6 +33,7 @@ beforeEach(() => {
   delete process.env.SMTP_FROM;
   delete process.env.MAIL_FROM;
   delete process.env.PUBLIC_BASE_URL;
+  delete process.env.UPLOADS_DIR;
 });
 
 test('firstEmail toma el primer valor con @', () => {
@@ -100,7 +103,12 @@ test('HTML incluye detalles, rastreo, nota anti-spam y hunters547.com', () => {
   assert.match(msg.html, /Confirmado/);
   assert.match(msg.html, /En preparación/);
   assert.match(msg.html, /Tubo PVC/);
-  assert.match(msg.html, /src="https:\/\/www\.hunters547\.cloud\/uploads\/portals\/2\/logo\.png"/);
+  assert.match(msg.html, new RegExp(`src="cid:${EMAIL_LOGO_CID}"`));
+  assert.doesNotMatch(msg.html, /src="https:\/\/www\.hunters547\.cloud\/uploads\//);
+  assert.equal(msg.attachments.length, 1);
+  assert.equal(msg.attachments[0].cid, EMAIL_LOGO_CID);
+  assert.equal(msg.attachments[0].contentDisposition, 'inline');
+  assert.equal(msg.attachments[0].path, defaultLogoFile());
   assert.match(
     msg.html,
     /href="https:\/\/www\.hunters547\.cloud\/rastreo\?codigo=H547-SMTP-838677"/
@@ -109,20 +117,38 @@ test('HTML incluye detalles, rastreo, nota anti-spam y hunters547.com', () => {
   assert.match(msg.html, new RegExp(`href="${HUNTERS_SITE_URL.replace(/\./g, '\\.')}"`));
 });
 
-test('sin logo de portal no pone img rota', () => {
+test('logo_path de /uploads ausente no emite img rota; usa CID del logo Hunters 547', () => {
+  process.env.PUBLIC_BASE_URL = 'https://www.hunters547.cloud';
+  const msg = buildOrderMessage(
+    { tracking_code: 'H547-TEST01', status: 'confirmado' },
+    { name: 'Marca ACME', logo_path: '/uploads/portals/2/logo.png' }
+  );
+  assert.doesNotMatch(msg.html, /src="[^"]*\/uploads\//i);
+  assert.doesNotMatch(msg.html, /src="https?:\/\//i);
+  assert.match(msg.html, /Marca ACME/);
+  assert.match(msg.html, new RegExp(`src="cid:${EMAIL_LOGO_CID}"`));
+  assert.equal(msg.attachments.length, 1);
+  assert.equal(msg.attachments[0].path, defaultLogoFile());
+});
+
+test('sin logo_path tampoco pone img remota; CID del fallback si el archivo existe', () => {
   process.env.PUBLIC_BASE_URL = 'https://www.hunters547.cloud';
   const msg = buildOrderMessage(
     { tracking_code: 'H547-TEST01', status: 'confirmado' },
     { name: 'Marca ACME', logo_path: null }
   );
-  assert.doesNotMatch(msg.html, /<img /i);
+  assert.doesNotMatch(msg.html, /src="[^"]*\/uploads\//i);
   assert.match(msg.html, /Marca ACME/);
+  assert.match(msg.html, new RegExp(`src="cid:${EMAIL_LOGO_CID}"`));
 });
 
-test('portalLogoSrc solo absoluta si hay logo_path y base pública', () => {
-  assert.equal(portalLogoSrc({ name: 'X' }), '');
+test('portalLogoSrc no construye URL pública a un /uploads inexistente', () => {
+  assert.equal(portalLogoSrc({ name: 'X' }), `cid:${EMAIL_LOGO_CID}`);
   process.env.PUBLIC_BASE_URL = 'https://www.hunters547.cloud/';
-  assert.equal(portalLogoSrc({ logo_path: '/uploads/portals/2/logo.png' }), 'https://www.hunters547.cloud/uploads/portals/2/logo.png');
+  assert.equal(
+    portalLogoSrc({ logo_path: '/uploads/portals/2/logo.png' }),
+    `cid:${EMAIL_LOGO_CID}`
+  );
   assert.equal(portalLogoSrc({ logo_path: 'https://cdn.example/logo.png' }), 'https://cdn.example/logo.png');
 });
 
@@ -143,6 +169,7 @@ test('escapa HTML en campos del pedido', () => {
   assert.match(msg.html, /OC&amp;1/);
   assert.match(msg.html, /Arena &lt;b&gt;fina&lt;\/b&gt;/);
   assert.match(msg.html, /src="https:\/\/cdn\.example\/a\.png\?x=&quot;y&quot;"/);
+  assert.equal(msg.attachments.length, 0);
 });
 
 test('From display name es exactamente Notificaciones', () => {

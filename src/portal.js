@@ -9,10 +9,8 @@ const {
   loadEncargadoOrderRows,
   countEq,
 } = require('./db');
+const { DEFAULT_LOGO, uploadsRoot, resolveExistingPublicFile } = require('./uploads');
 
-const DEFAULT_LOGO = '/assets/img/hunters547-logo.jpg';
-const UPLOAD_ROOT = path.join(__dirname, '..', 'public', 'uploads', 'portals');
-const DELIVERY_ROOT = path.join(__dirname, '..', 'public', 'uploads', 'deliveries');
 const ALLOWED_LOGO_MIME = {
   'image/jpeg': '.jpg',
   'image/jpg': '.jpg',
@@ -49,9 +47,7 @@ async function getPortal(id) {
 
 function logoUrl(portal) {
   if (!portal || !portal.logo_path) return DEFAULT_LOGO;
-  const rel = String(portal.logo_path).replace(/^\//, '');
-  const abs = path.join(__dirname, '..', 'public', rel);
-  if (fs.existsSync(abs)) return portal.logo_path;
+  if (resolveExistingPublicFile(portal.logo_path)) return portal.logo_path;
   return DEFAULT_LOGO;
 }
 
@@ -70,7 +66,7 @@ function saveLogo(portalId, file) {
     (path.extname(file.originalname || '').toLowerCase().match(/^\.(jpe?g|png|webp|gif)$/)
       ? path.extname(file.originalname).toLowerCase().replace('jpeg', 'jpg')
       : '.jpg');
-  const dir = path.join(UPLOAD_ROOT, String(portalId));
+  const dir = path.join(uploadsRoot(), 'portals', String(portalId));
   fs.mkdirSync(dir, { recursive: true });
   for (const f of fs.readdirSync(dir)) {
     if (f.startsWith('logo.')) {
@@ -93,7 +89,7 @@ function saveDeliveryAsset(orderId, file, kind) {
     (path.extname(file.originalname || '').toLowerCase().match(/^\.(jpe?g|png|webp|gif)$/)
       ? path.extname(file.originalname).toLowerCase().replace('jpeg', 'jpg')
       : '.jpg');
-  const dir = path.join(DELIVERY_ROOT, String(orderId));
+  const dir = path.join(uploadsRoot(), 'deliveries', String(orderId));
   fs.mkdirSync(dir, { recursive: true });
   const filename = `${kind}${ext}`;
   fs.writeFileSync(path.join(dir, filename), file.buffer);
@@ -105,7 +101,7 @@ function saveSignatureDataUrl(orderId, dataUrl) {
   const match = dataUrl.match(/^data:image\/(png|jpeg|jpg|webp);base64,(.+)$/i);
   if (!match) return null;
   const ext = match[1].toLowerCase() === 'jpeg' || match[1].toLowerCase() === 'jpg' ? '.jpg' : `.${match[1].toLowerCase()}`;
-  const dir = path.join(DELIVERY_ROOT, String(orderId));
+  const dir = path.join(uploadsRoot(), 'deliveries', String(orderId));
   fs.mkdirSync(dir, { recursive: true });
   const filename = `signature${ext}`;
   fs.writeFileSync(path.join(dir, filename), Buffer.from(match[2], 'base64'));
