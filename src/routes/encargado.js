@@ -2,11 +2,11 @@
 
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const { getDb, now, generateTrackingCode } = require('../db');
+const { getDb, now, generateTrackingCode, loadOrderItems, parseOrderItemsFromBody, insertOrderItems } = require('../db');
 const { requireAuth, requireRole, requirePortal, setFlash } = require('../middleware');
 const { ENCARGADO_FLOW, ORDER_STATUSES } = require('../constants');
 const { loadEncargadoMetrics, resolveDateRange } = require('../portal');
-const { notifyOrderStatusAsync } = require('../services/whatsapp');
+const { notifyOrderStatusAsync } = require('../services/mailer');
 
 const router = express.Router();
 router.use(requireAuth, requireRole('encargado'), requirePortal);
@@ -36,7 +36,7 @@ function loadChoferes(d, pid) {
 function loadCustomers(d, pid) {
   return d
     .prepare(
-      `SELECT c.id, c.name, c.phone, c.address, c.notes, c.active, c.created_at,
+      `SELECT c.id, c.name, c.phone, c.email, c.address, c.notes, c.active, c.created_at,
               u.username AS login_username, u.id AS user_id, u.active AS login_active
        FROM customers c
        LEFT JOIN users u ON u.cliente_id = c.id AND u.role = 'cliente' AND u.portal_id = c.portal_id
@@ -124,6 +124,7 @@ router.post('/orders', (req, res) => {
   const customerId = req.body.customer_id ? Number(req.body.customer_id) : null;
   let customer_name = String(req.body.customer_name || '').trim();
   let phone = String(req.body.phone || '').trim();
+  let email = String(req.body.email || '').trim();
   let address = String(req.body.address || '').trim();
   let notes = String(req.body.notes || '').trim();
   let chofer_id = req.body.chofer_id ? Number(req.body.chofer_id) : null;
@@ -159,6 +160,7 @@ router.post('/orders', (req, res) => {
       }
       customer_name = customer_name || c.name;
       phone = phone || c.phone;
+      email = email || c.email || '';
       address = address || c.address;
       notes = notes || c.notes || '';
     } else {
@@ -184,13 +186,16 @@ router.post('/orders', (req, res) => {
     return res.redirect('/encargado/nuevo');
   }
 
+  const purchase_order = String(req.body.purchase_order || '').trim();
+  const items = parseOrderItemsFromBody(req.body);
+
   const ts = now();
   try {
     const info = d
       .prepare(
         `INSERT INTO orders
-          (tracking_code, customer_id, customer_name, phone, address, notes, status, chofer_id, created_by, created_at, updated_at, portal_id)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
+          (tracking_code, customer_id, customer_name, phone, address, notes, status, chofer_id, created_by, created_at, updated_at, portal_id, purchase_order)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
       )
       .run(
         code,
@@ -204,19 +209,37 @@ router.post('/orders', (req, res) => {
         req.session.user.id,
         ts,
         ts,
-        pid
+        pid,
+        purchase_order
       );
+
+    insertOrderItems(info.lastInsertRowid, items);
+
+    if (customerId && email) {
+      d.prepare(
+        "UPDATE customers SET email = ? WHERE id = ? AND portal_id = ? AND (email IS NULL OR email = '')"
+      ).run(email, customerId, pid);
+    }
 
     d.prepare(
       'INSERT INTO status_history (order_id, status, changed_by, notes, created_at) VALUES (?,?,?,?,?)'
     ).run(info.lastInsertRowid, 'pedido_colocado', req.session.user.id, 'Creado por encargado', ts);
 
     notifyOrderStatusAsync({
+      id: info.lastInsertRowid,
       tracking_code: code,
       status: 'pedido_colocado',
+      previous_status: null,
+      is_create: true,
       phone,
+      email,
+      customer_id: customerId,
       customer_name,
       portal_id: pid,
+      purchase_order,
+      items,
+      created_at: ts,
+      updated_at: ts,
     });
 
     setFlash(req, 'ok', `Pedido creado: ${code}`);
@@ -293,12 +316,22 @@ router.post('/orders/:id/advance', (req, res) => {
   d.prepare(
     'INSERT INTO status_history (order_id, status, changed_by, notes, created_at) VALUES (?,?,?,?,?)'
   ).run(id, nxt, req.session.user.id, '', ts);
+  const custAdvance = order.customer_id
+    ? d.prepare('SELECT email FROM customers WHERE id = ?').get(order.customer_id)
+    : null;
   notifyOrderStatusAsync({
+    id: order.id,
     tracking_code: order.tracking_code,
     status: nxt,
+    previous_status: order.status,
     phone: order.phone,
+    email: (custAdvance && custAdvance.email) || '',
+    customer_id: order.customer_id,
     customer_name: order.customer_name,
     portal_id: pid,
+    purchase_order: order.purchase_order || '',
+    created_at: order.created_at,
+    updated_at: ts,
   });
   setFlash(req, 'ok', `Estado: ${ORDER_STATUSES[nxt]}`);
   res.redirect('/encargado');
@@ -323,12 +356,22 @@ router.post('/orders/:id/cancel', (req, res) => {
   d.prepare(
     'INSERT INTO status_history (order_id, status, changed_by, notes, created_at) VALUES (?,?,?,?,?)'
   ).run(id, 'cancelado', req.session.user.id, 'Cancelado', ts);
+  const custCancel = order.customer_id
+    ? d.prepare('SELECT email FROM customers WHERE id = ?').get(order.customer_id)
+    : null;
   notifyOrderStatusAsync({
+    id: order.id,
     tracking_code: order.tracking_code,
     status: 'cancelado',
+    previous_status: order.status,
     phone: order.phone,
+    email: (custCancel && custCancel.email) || '',
+    customer_id: order.customer_id,
     customer_name: order.customer_name,
     portal_id: pid,
+    purchase_order: order.purchase_order || '',
+    created_at: order.created_at,
+    updated_at: ts,
   });
   setFlash(req, 'ok', 'Pedido cancelado.');
   res.redirect('/encargado');
@@ -447,6 +490,7 @@ router.post('/clientes', (req, res) => {
   const pid = portalIdOf(req);
   const name = String(req.body.name || '').trim();
   const phone = String(req.body.phone || '').trim();
+  const email = String(req.body.email || '').trim();
   const address = String(req.body.address || '').trim();
   const notes = String(req.body.notes || '').trim();
   const username = String(req.body.username || '').trim();
@@ -460,9 +504,9 @@ router.post('/clientes', (req, res) => {
   const ts = now();
   const info = d
     .prepare(
-      'INSERT INTO customers (name, phone, address, notes, active, created_at, portal_id) VALUES (?,?,?,?,?,?,?)'
+      'INSERT INTO customers (name, phone, email, address, notes, active, created_at, portal_id) VALUES (?,?,?,?,?,?,?,?)'
     )
-    .run(name, phone, address, notes, 1, ts, pid);
+    .run(name, phone, email, address, notes, 1, ts, pid);
 
   if (username) {
     if (!password || password.length < 6) {
@@ -499,6 +543,7 @@ router.post('/clientes/:id', (req, res) => {
   }
   const name = String(req.body.name || '').trim();
   const phone = String(req.body.phone || '').trim();
+  const email = String(req.body.email || '').trim();
   const address = String(req.body.address || '').trim();
   const notes = String(req.body.notes || '').trim();
   if (!name) {
@@ -506,8 +551,8 @@ router.post('/clientes/:id', (req, res) => {
     return res.redirect(`/encargado/clientes?edit=${id}`);
   }
   d.prepare(
-    'UPDATE customers SET name = ?, phone = ?, address = ?, notes = ? WHERE id = ? AND portal_id = ?'
-  ).run(name, phone, address, notes, id, pid);
+    'UPDATE customers SET name = ?, phone = ?, email = ?, address = ?, notes = ? WHERE id = ? AND portal_id = ?'
+  ).run(name, phone, email, address, notes, id, pid);
 
   const loginUser = d
     .prepare("SELECT id FROM users WHERE cliente_id = ? AND role = 'cliente' AND portal_id = ?")
@@ -568,6 +613,41 @@ router.post('/clientes/:id/toggle', (req, res) => {
   }
   setFlash(req, 'ok', next ? `“${c.name}” activo.` : `“${c.name}” bloqueado.`);
   res.redirect('/encargado/clientes');
+});
+
+
+/** Detalle de pedido (materiales, OC, evidencia de entrega) */
+router.get('/pedido/:id', (req, res) => {
+  const d = getDb();
+  const pid = portalIdOf(req);
+  const id = Number(req.params.id);
+  const order = getPortalOrder(d, id, pid);
+  if (!order) {
+    setFlash(req, 'danger', 'Pedido no encontrado.');
+    return res.redirect('/encargado');
+  }
+  const items = loadOrderItems(id);
+  const history = d
+    .prepare(
+      `SELECT h.*, u.name AS changed_by_name
+       FROM status_history h
+       LEFT JOIN users u ON u.id = h.changed_by
+       WHERE h.order_id = ?
+       ORDER BY h.created_at ASC`
+    )
+    .all(id);
+  const chofer = order.chofer_id
+    ? d.prepare('SELECT id, name FROM users WHERE id = ?').get(order.chofer_id)
+    : null;
+  res.render('encargado-detalle', {
+    title: `Pedido ${order.tracking_code}`,
+    order,
+    items,
+    history,
+    chofer,
+    withSidebar: true,
+    activeNav: 'dashboard',
+  });
 });
 
 module.exports = router;

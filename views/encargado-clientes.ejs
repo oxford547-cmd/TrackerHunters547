@@ -13,7 +13,7 @@
   <div class="card mb">
     <div class="dash-card-head" style="margin-bottom:.75rem">
       <h2>Clientes registrados</h2>
-      <input type="search" class="search-input js-table-search" placeholder="Buscar nombre, tel, dirección…" data-table="clientes-table" aria-label="Buscar clientes">
+      <input type="search" class="search-input js-table-search" placeholder="Buscar nombre, email, tel, dirección…" data-table="clientes-table" aria-label="Buscar clientes">
     </div>
     <% if (!customers.length) { %>
       <p class="muted small">Aún no hay clientes.</p>
@@ -23,6 +23,7 @@
         <thead>
           <tr>
             <th>Nombre</th>
+            <th>Email</th>
             <th>Teléfono</th>
             <th>Estado</th>
             <th>Login</th>
@@ -31,12 +32,13 @@
         </thead>
         <tbody>
           <% customers.forEach(c => { %>
-          <tr data-search="<%= (c.name + ' ' + (c.phone||'') + ' ' + (c.address||'') + ' ' + (c.notes||'')).toLowerCase() %>">
+          <tr data-search="<%= (c.name + ' ' + (c.email||'') + ' ' + (c.phone||'') + ' ' + (c.address||'') + ' ' + (c.notes||'')).toLowerCase() %>">
             <td>
               <strong><%= c.name %></strong>
               <% if (c.address) { %><div class="muted small"><%= c.address %></div><% } %>
               <% if (c.notes) { %><div class="muted small"><%= c.notes %></div><% } %>
             </td>
+            <td><%= c.email || '—' %></td>
             <td><%= c.phone || '—' %></td>
             <td>
               <% if (c.active !== 0) { %>
@@ -76,6 +78,9 @@
         <label>Nombre
           <input type="text" name="name" required value="<%= editing.name %>">
         </label>
+        <label>Email
+          <input type="email" name="email" value="<%= editing.email || '' %>" placeholder="para avisos de estado" autocomplete="email">
+        </label>
         <label>Teléfono
           <input type="text" name="phone" value="<%= editing.phone || '' %>">
         </label>
@@ -106,6 +111,9 @@
       <form method="post" action="/encargado/clientes" class="form-stack">
         <label>Nombre
           <input type="text" name="name" required>
+        </label>
+        <label>Email
+          <input type="email" name="email" placeholder="para avisos de estado" autocomplete="email">
         </label>
         <label>Teléfono
           <input type="text" name="phone">

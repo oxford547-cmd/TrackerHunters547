@@ -100,7 +100,9 @@
         <tr>
           <td>
             <code><%= o.tracking_code %></code><br>
-            <a class="small" href="/rastreo?codigo=<%= encodeURIComponent(o.tracking_code) %>" target="_blank">Rastreo</a>
+            <a class="small" href="/encargado/pedido/<%= o.id %>">Detalle</a>
+            · <a class="small" href="/rastreo?codigo=<%= encodeURIComponent(o.tracking_code) %>" target="_blank">Rastreo</a>
+            <% if (o.purchase_order) { %><div class="muted small">OC: <%= o.purchase_order %></div><% } %>
             <div class="muted small"><%= o.created_at %></div>
           </td>
           <td>
