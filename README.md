@@ -32,7 +32,7 @@ npm run smoke       # requiere SUPABASE_* ; no toca el password
 
 ## Logos y `/uploads` en Hostinger
 
-Git deploy en Hostinger **reemplaza** `hbuilds/` y `public_html` en cada push. Los logos de portal se guardan en disco (`logo_path` p. ej. `/uploads/portals/2/logo.png`) y **no van en el repo**, así que tras un deploy el archivo desaparece: `https://www.hunters547.cloud/uploads/portals/2/logo.png` responde 404. El HTML del correo ya no pone esa URL (Gmail mostraría el icono roto); incrusta el archivo por CID si existe, o el logo Hunters 547 del repo.
+Git deploy en Hostinger **reemplaza** `hbuilds/` y `public_html` en cada push. Los logos de portal se guardan en disco (`logo_path` p. ej. `/uploads/portals/2/logo.png`) y **no van en el repo**, así que tras un deploy el archivo desaparece: `https://www.hunters547.cloud/uploads/portals/2/logo.png` responde 404. El HTML del correo no hotlinkea esa URL; incrusta el archivo por CID usando la **misma raíz** que `GET /uploads` (`UPLOADS_DIR` / `public/uploads`). Si `logo_path` está en la base y el disco local no se puede leer, el mailer pide los bytes a `PUBLIC_BASE_URL + logo_path` y los embebe por CID. Solo usa el logo Hunters 547 cuando el portal no tiene logo, o cuando ese archivo no se puede leer ni por disco ni por HTTP.
 
 Para que el logo **de cada marca** sobreviva deploys:
 
@@ -42,4 +42,4 @@ Para que el logo **de cada marca** sobreviva deploys:
 4. Comprueba `https://www.hunters547.cloud/uploads/portals/2/logo.png` → **200** `image/png` (o jpeg).
 5. Un pedido de prueba debe llegar a Gmail con el logo visible en el encabezado negro, From **Notificaciones**, sin icono de imagen rota.
 
-Sin `UPLOADS_DIR`, los logos vuelven a perderse en el siguiente Git deploy (habría que re-subirlos otra vez). Los correos seguirían viéndose bien con el logo Hunters 547 embebido.
+Sin `UPLOADS_DIR`, los logos vuelven a perderse en el siguiente Git deploy (habría que re-subirlos otra vez). Si el archivo aún se sirve en `https://www.hunters547.cloud/uploads/...` (HTTP 200), el correo debe mostrar el logo de la marca; Hunters 547 solo aparece cuando el portal no tiene logo.
