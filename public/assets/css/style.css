@@ -62,6 +62,21 @@ code {
   text-decoration: none;
   font-weight: 700;
 }
+.beta-label {
+  display: inline-block;
+  margin-left: .15rem;
+  padding: .08rem .4rem;
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  line-height: 1.2;
+  vertical-align: middle;
+}
+.site-footer .beta-label { margin: 0 .15rem; }
 .brand-logo {
   display: block;
   width: auto;

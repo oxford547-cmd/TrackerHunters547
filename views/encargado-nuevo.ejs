@@ -2,7 +2,6 @@
 <div class="dash-head">
   <div>
     <h1 class="dash-title lime">Nuevo pedido</h1>
-    <p class="muted">Asigna el <strong>número de pedido</strong> manualmente. Debe ser único en este portal.</p>
   </div>
   <div class="dash-actions">
     <a class="btn btn-glass" href="/encargado">Volver al dashboard</a>
@@ -13,12 +12,12 @@
   <form method="post" action="/encargado/orders" class="form-grid" id="nuevo-pedido-form">
     <label class="span-2">Número de pedido (tracking)
       <input type="text" name="tracking_code" required maxlength="64"
-             placeholder="Ej. <%= suggestedCode %>"
+             placeholder="<%= suggestedCode %>"
              autocomplete="off"
              pattern=".{3,64}"
              title="3 a 64 caracteres, único en el portal">
-      <span class="muted small">Sugerencia: <code class="js-suggest-code"><%= suggestedCode %></code>
-        <button type="button" class="btn btn-sm btn-glass js-use-suggest" style="margin-left:.35rem">Usar sugerencia</button>
+      <span class="muted small"><code class="js-suggest-code"><%= suggestedCode %></code>
+        <button type="button" class="btn btn-sm btn-glass js-use-suggest" style="margin-left:.35rem">Usar</button>
       </span>
     </label>
     <label class="span-2">Número de Orden de Compra
@@ -38,7 +37,6 @@
           </option>
         <% }) %>
       </select>
-      <span class="muted small">Al elegir un cliente se rellenan contacto, email, teléfono, dirección y notas.</span>
     </label>
     <label>Nombre / contacto
       <input type="text" name="customer_name" id="field-name" placeholder="Nombre del cliente">
@@ -61,7 +59,6 @@
         <strong>Material enviado</strong>
         <button type="button" class="btn btn-sm btn-glass" id="js-add-item">+ Línea</button>
       </div>
-      <p class="muted small">Agrega una o más líneas: descripción, unidad de medida y cantidad.</p>
       <div id="materials-rows"></div>
     </div>
 

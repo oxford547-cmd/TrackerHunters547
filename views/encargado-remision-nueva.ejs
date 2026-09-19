@@ -2,7 +2,7 @@
 <div class="dash-head">
   <div>
     <h1 class="dash-title lime">Nueva remisión provisional</h1>
-    <p class="muted">Folio siguiente: <strong><%= formatFolio(previewFolio) %></strong> · Fecha por defecto hoy</p>
+    <p class="muted">Folio <strong><%= formatFolio(previewFolio) %></strong></p>
   </div>
   <div class="dash-actions">
     <a class="btn btn-glass" href="/encargado/remisiones">Volver al listado</a>
@@ -15,7 +15,6 @@
     <div>
       <strong><%= companyName || brandName %></strong>
       <% if (companyAddress) { %><p class="muted small"><%= companyAddress %></p><% } %>
-      <% if (!companyAddress) { %><p class="muted small">Sin dirección de empresa — configúrala en el portal (superadmin).</p><% } %>
     </div>
   </div>
 </div>
@@ -42,13 +41,11 @@
         <strong>Líneas de remisión</strong>
         <button type="button" class="btn btn-sm btn-glass" id="js-add-rem-item">+ Línea</button>
       </div>
-      <p class="muted small">Cantidad, unidad, descripción, lote e importe opcional. El folio se asigna al guardar (`portals.remision_next`).</p>
       <div id="remision-rows"></div>
     </div>
 
-    <label>Total importe (opcional)
-      <input type="number" name="total_importe" id="field-total-importe" step="0.01" min="0" placeholder="Se calcula de las líneas si vacío">
-      <span class="muted small">Se guarda en <code>remisiones.total</code>.</span>
+    <label>Total importe
+      <input type="number" name="total_importe" id="field-total-importe" step="0.01" min="0">
     </label>
     <div class="align-end">
       <button type="submit" class="btn btn-glass-hot">Guardar remisión</button>
