@@ -210,12 +210,8 @@ router.post(
       });
 
       notifyOrderStatusAsync({
-        tracking_code: code,
-        status: 'pedido_colocado',
-        phone,
-        email,
-        customer_name,
-        portal_id: pid,
+        ...order,
+        items,
       });
 
       setFlash(req, 'ok', `Pedido creado: ${code}`);
@@ -289,12 +285,10 @@ router.post(
       created_at: ts,
     });
     notifyOrderStatusAsync({
-      tracking_code: order.tracking_code,
+      ...order,
       status: nxt,
-      phone: order.phone,
-      email: order.email,
-      customer_name: order.customer_name,
-      portal_id: pid,
+      previous_status: order.status,
+      updated_at: ts,
     });
     setFlash(req, 'ok', `Estado: ${ORDER_STATUSES[nxt]}`);
     res.redirect('/encargado');
@@ -321,12 +315,10 @@ router.post(
       created_at: ts,
     });
     notifyOrderStatusAsync({
-      tracking_code: order.tracking_code,
+      ...order,
       status: 'cancelado',
-      phone: order.phone,
-      email: order.email,
-      customer_name: order.customer_name,
-      portal_id: pid,
+      previous_status: order.status,
+      updated_at: ts,
     });
     setFlash(req, 'ok', 'Pedido cancelado.');
     res.redirect('/encargado');
