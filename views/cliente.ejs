@@ -1,11 +1,7 @@
 <%- include('partials/head', { withSidebar: true, activeNav: 'cliente' }) %>
 <div class="page-head">
   <h1>Mis pedidos</h1>
-  <p class="muted">
-    Hola, <strong><%= user.name %></strong>.
-    Solo ves pedidos de tu cuenta
-    <% if (customer) { %>(<%= customer.name %>)<% } %>.
-  </p>
+  <% if (customer) { %><p class="muted"><%= customer.name %></p><% } %>
 </div>
 
 <div class="card">
