@@ -3,8 +3,14 @@
 const { ORDER_STATUSES, PUBLIC_BASE_URL } = require('../constants');
 const { findPortalById } = require('../db');
 
+function smtpFrom() {
+  const primary = String(process.env.SMTP_FROM || '').trim();
+  if (primary) return primary;
+  return String(process.env.MAIL_FROM || '').trim();
+}
+
 function hasSmtpCreds() {
-  return Boolean(process.env.SMTP_HOST && process.env.SMTP_FROM);
+  return Boolean(process.env.SMTP_HOST && smtpFrom());
 }
 
 function statusLabel(statusKey) {
@@ -97,7 +103,7 @@ async function sendMail({ to, subject, text }) {
 
   try {
     const info = await transporter.sendMail({
-      from: process.env.SMTP_FROM,
+      from: smtpFrom(),
       to,
       subject,
       text,
@@ -133,6 +139,7 @@ function notifyOrderStatusAsync(order) {
 }
 
 module.exports = {
+  smtpFrom,
   hasSmtpCreds,
   firstEmail,
   buildOrderMessage,

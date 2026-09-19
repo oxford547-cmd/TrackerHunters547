@@ -5,10 +5,17 @@ delete process.env.SMTP_PORT;
 delete process.env.SMTP_USER;
 delete process.env.SMTP_PASS;
 delete process.env.SMTP_FROM;
+delete process.env.MAIL_FROM;
 
 const { test, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
-const { firstEmail, buildOrderMessage, notifyOrderStatus } = require('../src/services/email');
+const {
+  firstEmail,
+  buildOrderMessage,
+  notifyOrderStatus,
+  hasSmtpCreds,
+  smtpFrom,
+} = require('../src/services/email');
 
 beforeEach(() => {
   delete process.env.SMTP_HOST;
@@ -16,6 +23,7 @@ beforeEach(() => {
   delete process.env.SMTP_USER;
   delete process.env.SMTP_PASS;
   delete process.env.SMTP_FROM;
+  delete process.env.MAIL_FROM;
   delete process.env.PUBLIC_BASE_URL;
 });
 
@@ -68,6 +76,20 @@ test('email inválido no lanza', async () => {
   });
   assert.equal(result.ok, false);
   assert.equal(result.error, 'invalid_email');
+});
+
+test('SMTP_FROM habilita envío; MAIL_FROM es alias', () => {
+  process.env.SMTP_HOST = 'smtp.hostinger.com';
+  assert.equal(hasSmtpCreds(), false);
+  assert.equal(smtpFrom(), '');
+
+  process.env.MAIL_FROM = '  info@yourdomain  ';
+  assert.equal(hasSmtpCreds(), true);
+  assert.equal(smtpFrom(), 'info@yourdomain');
+
+  process.env.SMTP_FROM = 'hello@yourdomain';
+  assert.equal(hasSmtpCreds(), true);
+  assert.equal(smtpFrom(), 'hello@yourdomain');
 });
 
 test('asunto usa la marca del portal', () => {
