@@ -2,7 +2,7 @@
 
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const { getDb, now, generateTrackingCode } = require('../db');
+const { getDb, now, generateTrackingCode, loadOrderItems, parseOrderItemsFromBody, insertOrderItems } = require('../db');
 const { requireAuth, requireRole, requirePortal, setFlash } = require('../middleware');
 const { ENCARGADO_FLOW, ORDER_STATUSES } = require('../constants');
 const { loadEncargadoMetrics, resolveDateRange } = require('../portal');
@@ -184,13 +184,16 @@ router.post('/orders', (req, res) => {
     return res.redirect('/encargado/nuevo');
   }
 
+  const purchase_order = String(req.body.purchase_order || '').trim();
+  const items = parseOrderItemsFromBody(req.body);
+
   const ts = now();
   try {
     const info = d
       .prepare(
         `INSERT INTO orders
-          (tracking_code, customer_id, customer_name, phone, address, notes, status, chofer_id, created_by, created_at, updated_at, portal_id)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
+          (tracking_code, customer_id, customer_name, phone, address, notes, status, chofer_id, created_by, created_at, updated_at, portal_id, purchase_order)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
       )
       .run(
         code,
@@ -204,8 +207,11 @@ router.post('/orders', (req, res) => {
         req.session.user.id,
         ts,
         ts,
-        pid
+        pid,
+        purchase_order
       );
+
+    insertOrderItems(info.lastInsertRowid, items);
 
     d.prepare(
       'INSERT INTO status_history (order_id, status, changed_by, notes, created_at) VALUES (?,?,?,?,?)'
@@ -568,6 +574,41 @@ router.post('/clientes/:id/toggle', (req, res) => {
   }
   setFlash(req, 'ok', next ? `“${c.name}” activo.` : `“${c.name}” bloqueado.`);
   res.redirect('/encargado/clientes');
+});
+
+
+/** Detalle de pedido (materiales, OC, evidencia de entrega) */
+router.get('/pedido/:id', (req, res) => {
+  const d = getDb();
+  const pid = portalIdOf(req);
+  const id = Number(req.params.id);
+  const order = getPortalOrder(d, id, pid);
+  if (!order) {
+    setFlash(req, 'danger', 'Pedido no encontrado.');
+    return res.redirect('/encargado');
+  }
+  const items = loadOrderItems(id);
+  const history = d
+    .prepare(
+      `SELECT h.*, u.name AS changed_by_name
+       FROM status_history h
+       LEFT JOIN users u ON u.id = h.changed_by
+       WHERE h.order_id = ?
+       ORDER BY h.created_at ASC`
+    )
+    .all(id);
+  const chofer = order.chofer_id
+    ? d.prepare('SELECT id, name FROM users WHERE id = ?').get(order.chofer_id)
+    : null;
+  res.render('encargado-detalle', {
+    title: `Pedido ${order.tracking_code}`,
+    order,
+    items,
+    history,
+    chofer,
+    withSidebar: true,
+    activeNav: 'dashboard',
+  });
 });
 
 module.exports = router;

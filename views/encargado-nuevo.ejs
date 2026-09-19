@@ -21,6 +21,9 @@
         <button type="button" class="btn btn-sm btn-glass js-use-suggest" style="margin-left:.35rem">Usar sugerencia</button>
       </span>
     </label>
+    <label class="span-2">Número de Orden de Compra
+      <input type="text" name="purchase_order" maxlength="120" placeholder="OC / PO del cliente (opcional)" autocomplete="off">
+    </label>
     <label>Cliente existente (alta)
       <select name="customer_id" id="customer-select">
         <option value="" data-name="" data-phone="" data-address="" data-notes="">— Nuevo / manual —</option>
@@ -48,6 +51,16 @@
     <label class="span-2">Notas
       <textarea name="notes" id="field-notes" rows="2" placeholder="Instrucciones de entrega"></textarea>
     </label>
+
+    <div class="span-2 materials-editor">
+      <div class="materials-editor-head">
+        <strong>Material enviado</strong>
+        <button type="button" class="btn btn-sm btn-glass" id="js-add-item">+ Línea</button>
+      </div>
+      <p class="muted small">Agrega una o más líneas: descripción, unidad de medida y cantidad.</p>
+      <div id="materials-rows"></div>
+    </div>
+
     <label>Chofer
       <select name="chofer_id">
         <option value="">— Sin asignar —</option>
@@ -61,6 +74,20 @@
     </div>
   </form>
 </div>
+<template id="material-row-tpl">
+  <div class="material-row">
+    <label>Descripción
+      <input type="text" name="item_description[]" placeholder="Material / producto">
+    </label>
+    <label>Unidad de medida
+      <input type="text" name="item_uom[]" placeholder="PZ, KG, M…" value="PZ">
+    </label>
+    <label>Cantidad
+      <input type="number" name="item_quantity[]" min="0.001" step="any" value="1">
+    </label>
+    <button type="button" class="btn btn-sm btn-danger js-remove-item" title="Quitar línea">×</button>
+  </div>
+</template>
 <script>
 document.querySelector('.js-use-suggest')?.addEventListener('click', function () {
   const code = document.querySelector('.js-suggest-code')?.textContent?.trim();
@@ -84,6 +111,33 @@ document.querySelector('.js-use-suggest')?.addEventListener('click', function ()
     if (notes) notes.value = opt.getAttribute('data-notes') || '';
   }
   sel.addEventListener('change', apply);
+})();
+
+(function materialsEditor() {
+  const wrap = document.getElementById('materials-rows');
+  const tpl = document.getElementById('material-row-tpl');
+  const addBtn = document.getElementById('js-add-item');
+  if (!wrap || !tpl || !addBtn) return;
+
+  function addRow() {
+    const node = tpl.content.cloneNode(true);
+    const row = node.querySelector('.material-row');
+    row.querySelector('.js-remove-item').addEventListener('click', () => {
+      if (wrap.querySelectorAll('.material-row').length <= 1) {
+        row.querySelectorAll('input').forEach((inp) => {
+          if (inp.name === 'item_quantity[]') inp.value = '1';
+          else if (inp.name === 'item_uom[]') inp.value = 'PZ';
+          else inp.value = '';
+        });
+        return;
+      }
+      row.remove();
+    });
+    wrap.appendChild(node);
+  }
+
+  addBtn.addEventListener('click', addRow);
+  addRow();
 })();
 </script>
 <%- include('partials/foot') %>

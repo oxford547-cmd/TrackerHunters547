@@ -1,7 +1,7 @@
 'use strict';
 
 const express = require('express');
-const { getDb } = require('../db');
+const { getDb, loadOrderItems } = require('../db');
 const { requireAuth, requireRole, requirePortal } = require('../middleware');
 
 const router = express.Router();
@@ -34,10 +34,13 @@ router.get('/', (req, res) => {
     )
     .all(req.session.user.id, pid);
 
+  const attachItems = (list) =>
+    list.map((o) => ({ ...o, items: loadOrderItems(o.id) }));
+
   res.render('chofer', {
     title: 'Mis entregas',
-    orders,
-    recent,
+    orders: attachItems(orders),
+    recent: attachItems(recent),
   });
 });
 
