@@ -1,8 +1,7 @@
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
 const { getSupabase, throwIfError } = require('./supabase');
+const { ensureUploadDirs } = require('./uploads');
 const {
   parseOrderItemsFromBody,
   parseRemisionItemsFromBody,
@@ -858,14 +857,6 @@ async function loadEncargadoOrderRows(portalId) {
     .eq('portal_id', portalId);
   throwIfError(res, 'loadEncargadoOrderRows');
   return res.data || [];
-}
-
-function ensureUploadDirs() {
-  const roots = [
-    path.join(__dirname, '..', 'public', 'uploads', 'portals'),
-    path.join(__dirname, '..', 'public', 'uploads', 'deliveries'),
-  ];
-  for (const dir of roots) fs.mkdirSync(dir, { recursive: true });
 }
 
 /** Production path is Supabase-only. No SQLite schema is created. */

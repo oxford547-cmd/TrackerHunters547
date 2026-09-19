@@ -9,6 +9,7 @@ const { PORT, SESSION_SECRET } = require('./src/constants');
 const { ensureReady } = require('./src/db');
 const { seed } = require('./src/seed');
 const { viewLocals } = require('./src/middleware');
+const { mountUploads } = require('./src/uploads');
 
 async function main() {
   await ensureReady();
@@ -36,6 +37,7 @@ async function main() {
       },
     })
   );
+  mountUploads(app);
   app.use(express.static(path.join(__dirname, 'public')));
   app.use(viewLocals);
 
